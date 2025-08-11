@@ -272,7 +272,7 @@ Main class for executing OData operations on Peewee models.
 - **allowed_objects** (list): List of allowed model classes
 - **logger** (Logger, optional): Logger for operation tracking
 - **etag_callable** a method of model to dynamically generate etag
-- **select_always** fields to select , even if they are not included in select (e.g id , etag etc)
+- **select_always** fields to request , even if they are not included in select parameter (e.g id , etag etc)
 #### Methods
 
 - **query(where=[], join=[])**: Execute SELECT query
