@@ -641,6 +641,8 @@ class PeweeODataQuery:
 
         Args:
             query_result    model class to loop for backrefs and foreignkeys to check
+            with_odata_id   include odata id? id should be in the selected fields
+            include_etag    etag metho should be defined in class model and given in constructor as parameter
 
         """ 
         def serialize(obj):
