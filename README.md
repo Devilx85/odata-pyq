@@ -50,7 +50,8 @@ pip install peewee lark
 ## Quick Start
 
 **IMPORTANT!**
-Mdoels navigation starts with any provided class as alllowed models in lowercase + "s".
+Model's navigation starts with any provided class in "models" parameter of the constructor. 
+Name of the path should starts with class name in lowercase + "s".
 Exmaple: class User will be searched as "users" in the query path start. 
 ForeignKey fields and backrefs can be navigated if class is listed in models or in expandable parameter.
 
