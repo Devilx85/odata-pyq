@@ -20,7 +20,7 @@ A Python library that provides OData query parsing and seamless integration with
 
 - **Comparison operators**: `eq`, `ne`, `gt`, `lt`, `ge`, `le`
 - **String functions**: `contains()`, `startswith()`, `endswith()`
-- **Logical operators**: `and`, `or`
+- **Logical operators**: `and`, `or`,`not`
 
 ### CRUD Operations
 
