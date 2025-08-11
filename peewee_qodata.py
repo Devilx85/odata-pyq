@@ -51,7 +51,7 @@ class NavigationPath:
         self.where.append( field1 == field2)
 
 
-class PeweeODataQuery:
+class PeeweeODataQuery:
     """Main class for OData operations
 
     Currently supports basic queries:
@@ -684,7 +684,7 @@ class PeweeODataQuery:
                         raise Exception(f"Cannot resolve backref field for {exp}")
 
                     #build a query object for the recursive backref processing
-                    sub_tree = PeweeODataQuery(model, "/s$?" + nested,allowed_objects=self.allowed_objects,etag_callable=self.etag_callable,select_always=self.select_always)
+                    sub_tree = PeeweeODataQuery(model, "/s$?" + nested,allowed_objects=self.allowed_objects,etag_callable=self.etag_callable,select_always=self.select_always)
                     filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
 
                     # Serialize the filtered and expanded result
