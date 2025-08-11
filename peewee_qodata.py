@@ -555,7 +555,7 @@ class PeeweeODataQuery:
                 
                 # if key provided in the Odata path apply it
                 if "keys" in item and item["keys"]:
-                    self.write_logo(f"Adding keys: { item['keys'] }")
+                    self.write_log(f"Adding keys: { item['keys'] }")
                     ref_class.add_id_cond(item["keys"])
                     data_type = DataType.ENTITY
 
