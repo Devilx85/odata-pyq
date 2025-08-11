@@ -532,7 +532,7 @@ class PeeweeODataQuery:
         """ 
         start_seg = self.parser.parsed_path[0]["entity"]
 
-        ini_class = next((item for item in self.models if item.__name__.lower() == start_seg ),None)
+        ini_class = next((item for item in self.models if item.__name__.lower()+"s" == start_seg ),None)
 
         if not ini_class:
             raise Exception(f"Object collection {start_seg} does not exist or not defined") 
@@ -727,7 +727,7 @@ class PeeweeODataQuery:
                         raise Exception(f"Cannot resolve backref field for {exp}")
 
                     #build a query object for the recursive backref processing
-                    sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
+                    sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
                     filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
                     # Serialize the filtered and expanded result
                     data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
