@@ -130,7 +130,7 @@ class PeweeODataQuery:
         if self.select_fields:
             for mod_class,field in self.select_fields:
                 select.append(field)
-            DBHelper.app.logger.info(f"Selecting fields {self.select}")
+            self.write_log(f"Selecting fields {self.select}")
 
 
         self.write_log(f"Building req ...sel {self.select} join {self.joins} where {self.where_cond} , backrefs {backrefs}")
@@ -227,7 +227,7 @@ class PeweeODataQuery:
         
         if len(self.path_classes)>1 and self.path_classes[-2].data_type == DataType.ENTITY:
             prev_navig = self.path_classes[-2]
-            DBHelper.app.logger.info(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.id} ")
+            self.write_log(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.id} ")
             data[cur_navig.backref_field.name] = prev_navig.id
         
 
@@ -340,7 +340,7 @@ class PeweeODataQuery:
             for seg in segs[:-1]:
                 rel_class , data_type , backref= self.find_model_rel(cur_class,seg)
                 if not rel_class:
-                    DBHelper.app.logger.info(f"No name {seg}")
+                    self.write_log(f"No name {seg}")
                     raise Exception(f"Unknown field {seg}") 
                 
                 self.write_log(f"Resolved class for the field ref {rel_class}")
@@ -547,7 +547,7 @@ class PeweeODataQuery:
                 
                 # if key provided in the Odata path apply it
                 if "keys" in item and item["keys"]:
-                    DBHelper.app.logger.info(f"Adding keys: { item['keys'] }")
+                    self.write_logo(f"Adding keys: { item['keys'] }")
                     ref_class.add_id_cond(item["keys"])
                     data_type = DataType.ENTITY
 
@@ -558,7 +558,7 @@ class PeweeODataQuery:
             self.navigated_class = found_class
 
             for item in self.path_classes:
-                DBHelper.app.logger.info(f"Dicsovering path...{item.cl_model} {item.where} ")
+                self.write_log(f"Dicsovering path...{item.cl_model} {item.where} ")
             
 
     def apply_expand_model(self,starting_class:Model):
@@ -595,7 +595,7 @@ class PeweeODataQuery:
         for field_name, field_object in model_class._meta.fields.items():
             if field_name == name and isinstance(field_object, ForeignKeyField):
                 self._model_rel_cache[cache_key] = (field_object.rel_model,DataType.FIELD,False)
-                DBHelper.app.logger.info(f"Resolved relation via model field: { name } from { model_class }")
+                self.write_log(f"Resolved relation via model field: { name } from { model_class }")
                 return self._model_rel_cache[cache_key] 
 
 
@@ -603,7 +603,7 @@ class PeweeODataQuery:
 
         if hasattr(model_class,name):
             attr = getattr(model_class, name)
-            DBHelper.app.logger.info(f"Listing backref: { name } from { type(attr).__name__  }")
+            self.write_log(f"Listing backref: { name } from { type(attr).__name__  }")
             if type(attr).__name__ == 'BackrefAccessor':
                 related_model = getattr(attr, 'rel_model', None)
                 self._model_rel_cache[cache_key] = (related_model,DataType.COLLECTION,True)
