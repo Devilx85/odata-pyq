@@ -7,7 +7,7 @@ A Python library that provides OData query parsing and seamless integration with
 ### OData Query Support
 
 - **$filter** - Filter results with Boolean conditions and logical operators (AND/OR)
-- **$select** - Choose specific fields to include in responses
+- **$select** - Choose specific fields to include in responses (supported only as sinmple list , separated by comma)
 - **$expand** - Include related entities inline (supports nested parameters)
 - **$orderby** - Sort results by one or more properties
 - **$top** - Limit the number of results returned
@@ -36,6 +36,7 @@ A Python library that provides OData query parsing and seamless integration with
 - Circular reference detection and prevention
 - Model access control via allowed objects list
 - Comprehensive logging support
+- etag and odata id on-fly inclusion
 
 ## Installation
 
@@ -267,7 +268,8 @@ Main class for executing OData operations on Peewee models.
 - **url** (str): OData URL to parse
 - **allowed_objects** (list): List of allowed model classes
 - **logger** (Logger, optional): Logger for operation tracking
-
+- **etag_callable** a method of model to dynamically generate etag
+- **select_always** fields to select , even if they are not included in select (e.g id , etag etc)
 #### Methods
 
 - **query(where=[], join=[])**: Execute SELECT query
@@ -282,6 +284,14 @@ Main class for executing OData operations on Peewee models.
 - Deep structure creation/updates not yet supported
 - Relationship operations and OData functions partially implemented
 - Complex nested expand operations may have performance implications
+
+## Etags and Odata id tags in result
+
+To correctly perform operation you need include always id, and set with_odata_id to Trur in peewee_result_to_dict_or_list. 
+Etags you can generate out of model itself, providing in constructor etag_callable parameter. A good example is generating
+etag from id and last modification time or version. in this case both fields you need to select in the model via select_always
+list. This ensures that fields are always in the select statement, they will be hidden in case select query does not contain 
+them.
 
 ## Contributing
 
