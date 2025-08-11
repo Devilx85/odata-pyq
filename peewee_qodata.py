@@ -572,6 +572,9 @@ class PeweeODataQuery:
             for item,nested in self.parser.expand:
                 exp_class, data_type,backref = self.find_model_rel(starting_class,item)
                 if exp_class:
+
+                    if exp_class not in self.allowed_objects:
+                        raise Exception(f"Operation (expand) is not allowed!")
                     if item not in self.expands:
                         self.write_log(f"Adding expand {item} {nested}")
                         #add expand parameter for later processing
