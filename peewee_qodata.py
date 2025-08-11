@@ -64,19 +64,18 @@ class PeeweeODataQuery:
         Relatioship orerations or functions are not yet implemented
 
     """
-    def __init__(self,initial_class:Model, url:str , allowed_objects=[],logger:Logger = None,etag_callable=None,select_always=["id"]):
+    def __init__(self,models:list, url:str , expandable=[],logger:Logger = None,etag_callable=None,select_always=["id"]):
         """Constructor
 
         Args:
-            inital_class        peewee model class - inital point
+            models:             allowed models
             url:                url to parse
-            allowed_objects     aloowed peewee model clases to manipulate
+            expandable          allowed peewee model clases to expand, but not to browse as root (no modification allowed)
             logger              logger to log operations
             etag_callable       object function to get etag (all models should have it implemented if given)
             select_always       a list of fileds to select alwys like id or modification date/time, since they are needed for some specific manipulation before final output
         """
-
-        self.inital_class = initial_class
+        self.models=models
         self.navigated_class = None
         self.logger = logger
         self.etag_callable = etag_callable
@@ -86,7 +85,7 @@ class PeeweeODataQuery:
         self.parser.run()
 
         self.parent = None
-        self.select = [self.inital_class]
+        self.select = []
         self.select_fields = []
         self.joins = []
         self.where_cond = []
@@ -98,8 +97,8 @@ class PeeweeODataQuery:
         # Add a cache for model relationships
         self._model_rel_cache = {}
 
-        self.allowed_objects = allowed_objects
-        self.allowed_objects.append(initial_class)
+        self.expandable = expandable
+
 
         self.apply_navigation_model()
     
@@ -182,6 +181,10 @@ class PeeweeODataQuery:
             raise Exception(f"Mutation does not support query parameters!")
         
         cur_navig = self.path_classes[-1]
+
+        if cur_navig.cl_model not in self.models:
+            raise Exception(f"Data collection is not supported") 
+        
         if cur_navig.data_type != DataType.COLLECTION:
             raise Exception(f"Can only create entities for collections!")
 
@@ -215,7 +218,12 @@ class PeeweeODataQuery:
         """        
         if self.parser.has_parameters():
             raise Exception(f"Mutation does not support query parameters!")
+        
         cur_navig = self.path_classes[-1]
+        
+        if cur_navig.cl_model not in self.models:
+            raise Exception(f"Data collection is not supported") 
+    
         if cur_navig.data_type != DataType.ENTITY:
             raise Exception(f"Can only update entities ,not collections!")
         
@@ -266,7 +274,12 @@ class PeeweeODataQuery:
         """         
         if self.parser.has_parameters():
             raise Exception(f"Mutation does not support query parameters!")
+        
         cur_navig = self.path_classes[-1]
+        
+        if cur_navig.cl_model not in self.models:
+            raise Exception(f"Data collection is not supported") 
+    
         if cur_navig.data_type != DataType.ENTITY:
             raise Exception(f"Can only update entities ,not collections!")
         
@@ -346,6 +359,10 @@ class PeeweeODataQuery:
                 if not rel_class:
                     self.write_log(f"No name {seg}")
                     raise Exception(f"Unknown field {seg}") 
+                
+                #allow only defined models
+                if rel_class not in self.models and rel_class not in self.expandable:
+                    raise Exception("Path or attribute does not exist")
                 
                 self.write_log(f"Resolved class for the field ref {rel_class}")
                 cur_class = rel_class
@@ -513,11 +530,16 @@ class PeeweeODataQuery:
             
 
         """ 
-  
+        start_seg = self.parser.parsed_path[0]["entity"]
+
+        ini_class = next((item for item in self.models if item.__name__.lower() == start_seg ),None)
+
+        if not ini_class:
+            raise Exception(f"Object collection {start_seg} does not exist or not defined") 
 
         self.path_classes = []
-        self.navigated_class = self.inital_class
-        ini_path = NavigationPath(self.inital_class,path=self.parser.parsed_path[0]["entity"])
+        self.navigated_class = ini_class
+        ini_path = NavigationPath(ini_class,path=start_seg)
     
         if self.parser.parsed_path[0]["keys"]:
             ini_path.add_id_cond(self.parser.parsed_path[0]["keys"])
@@ -537,7 +559,7 @@ class PeeweeODataQuery:
                     raise Exception(f"Incorrect path , two collections cannot be realted {self.path_classes[-1].path} and {item['entity']}")
                 
                 self.write_log(f"Checking if class {found_class} is allowed in {self.allowed_objects} ")
-                if found_class not in self.allowed_objects:
+                if found_class not in self.models and found_class not in self.expandable:
                     raise Exception(f"Operations is not allowed!")
                 
                 self.write_log(f"Found path: { item['entity'] }")
@@ -586,7 +608,7 @@ class PeeweeODataQuery:
                 exp_class, data_type,backref = self.find_model_rel(starting_class,item)
                 if exp_class:
 
-                    if exp_class not in self.allowed_objects:
+                    if exp_class not in self.models and exp_class not in self.expandable:
                         raise Exception(f"Operation (expand) is not allowed!")
                     if item not in self.expands:
                         self.write_log(f"Adding expand {item} {nested}")
@@ -653,7 +675,7 @@ class PeeweeODataQuery:
         def serialize(obj):
             #Internal function for recursive processing
             data = obj.__data__.copy()
-            if with_odata_id and self.path_classes[0].path != 's$':
+            if with_odata_id:
                 name = self._extract_before_parenthesis(self.path_classes[0].path)
                 data["@odata.id"] = f"{name}({data['id']})"
             if include_etag:
@@ -676,8 +698,24 @@ class PeeweeODataQuery:
 
 
             for model,exp,nested in self.expands:
+                
                 self.write_log(f"Expanding {exp} {nested} ")
 
+                child_include_etag = include_etag
+                child_etag_callable = self.etag_callable
+                child_include_etag = include_etag
+                child_with_odata_id = with_odata_id
+
+                if model not in self.models:
+                    child_include_etag = False
+                    child_etag_callable = None
+                    child_include_etag = False
+                    child_with_odata_id = False
+                    child_models = [model]
+                    child_expandabel = []
+                else:
+                    child_models = self.models
+                    child_expandabel = self.expandable
 
                 if nested:
 
@@ -689,11 +727,10 @@ class PeeweeODataQuery:
                         raise Exception(f"Cannot resolve backref field for {exp}")
 
                     #build a query object for the recursive backref processing
-                    sub_tree = PeeweeODataQuery(model, "/s$?" + nested,allowed_objects=self.allowed_objects,etag_callable=self.etag_callable,select_always=self.select_always)
+                    sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
                     filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
-
                     # Serialize the filtered and expanded result
-                    data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=include_etag)
+                    data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
 
                     return data
                 else:
