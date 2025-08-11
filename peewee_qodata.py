@@ -64,7 +64,7 @@ class PeweeODataQuery:
         Relatioship orerations or functions are not yet implemented
 
     """
-    def __init__(self,initial_class:Model, url:str , allowed_objects=[],logger:Logger = None):
+    def __init__(self,initial_class:Model, url:str , allowed_objects=[],logger:Logger = None,etag_callable=None,select_always=["id"]):
         """Constructor
 
         Args:
@@ -72,11 +72,14 @@ class PeweeODataQuery:
             url:                url to parse
             allowed_objects     aloowed peewee model clases to manipulate
             logger              logger to log operations
+            etag_callable       object function to get etag (all models should have it implemented if given)
+            select_always       a list of fileds to select alwys like id or modification date/time, since they are needed for some specific manipulation before final output
         """
 
         self.inital_class = initial_class
         self.navigated_class = None
         self.logger = logger
+        self.etag_callable = etag_callable
 
         #Parse Parameters
         self.parser = ODataParser(url)
@@ -90,6 +93,7 @@ class PeweeODataQuery:
         self.path_classes = None
         self.expands = []
         self.sorts = []
+        self.select_always = select_always
 
         # Add a cache for model relationships
         self._model_rel_cache = {}
@@ -454,7 +458,11 @@ class PeweeODataQuery:
 
         """ 
         if self.parser.select: 
-            for field in self.parser.select:
+            total_sel = []
+            total_sel.extend(self.parser.select)
+            total_sel.extend(self.select_always)
+
+            for field in total_sel:
                 
                 if field in self.navigated_class._meta.fields and field not in self.select_fields:
                     self.write_log(f"Adding selection field {field}")
@@ -618,8 +626,17 @@ class PeweeODataQuery:
 
         return  None , None , None
 
+    
+    def _extract_before_parenthesis(self,text):
+        """ Extracts path without id data
 
-    def peewee_result_to_dict_or_list(self, query_result)-> list | dict:
+        Args:
+            text  string
+
+        """ 
+        return text.split('(')[0].strip()
+
+    def peewee_result_to_dict_or_list(self, query_result,with_odata_id=True,include_etag=False)-> list | dict:
         """ Converts query result to a dictionary or list od dicts
 
         Args:
@@ -629,8 +646,27 @@ class PeweeODataQuery:
         def serialize(obj):
             #Internal function for recursive processing
             data = obj.__data__.copy()
-
+            if with_odata_id and self.path_classes[0].path != 's$':
+                name = self._extract_before_parenthesis(self.path_classes[0].path)
+                data["@odata.id"] = f"{name}({data['id']})"
+            if include_etag:
+                print(obj)
+                f = getattr(obj,self.etag_callable)
+                data["@odata.etag"] = f()
             # Include related models
+            
+            difference = None
+
+            if self.parser.select:
+                #Hide fiedls which should be always selected but not in the list, like id    
+                difference = [item for item in self.select_always if item not in self.parser.select]
+
+
+                data = {
+                    k: '' if k in difference else v
+                    for k, v in data.items()
+                }
+
 
             for model,exp,nested in self.expands:
                 self.write_log(f"Expanding {exp} {nested} ")
@@ -646,11 +682,11 @@ class PeweeODataQuery:
                         raise Exception(f"Cannot resolve backref field for {exp}")
 
                     #build a query object for the recursive backref processing
-                    sub_tree = PeweeODataQuery(model, "/s?" + nested,allowed_objects=self.allowed_objects)
+                    sub_tree = PeweeODataQuery(model, "/s$?" + nested,allowed_objects=self.allowed_objects,etag_callable=self.etag_callable,select_always=self.select_always)
                     filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
 
                     # Serialize the filtered and expanded result
-                    data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query)
+                    data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=include_etag)
 
                     return data
                 else:
@@ -659,7 +695,17 @@ class PeweeODataQuery:
                         getattr(model, obj.__class__.__name__.lower()) == obj.id
                     )
 
-                data[exp] = [item.__data__ for item in query]
+                if include_etag:
+                    data[exp] = [{**item.__data__, "new_key": getattr(item,self.etag_callable)()} for item in query]
+                else:
+                    data[exp] = [item.__data__ for item in query]
+
+                #Hide fiedls which should be always selected but not in the list, like id       
+                if difference:
+                    data[exp] = [
+                    {**item, **{key: '' for key in difference}} for item in data[exp]
+                    ]    
+
 
             return data
 

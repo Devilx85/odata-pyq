@@ -15,7 +15,7 @@ key_value: dotted_name "=" value
 value: SIGNED_NUMBER      -> number
      | ESCAPED_STRING     -> string
 
-dotted_name: /[a-zA-Z_][a-zA-Z0-9_.]*/
+dotted_name: /[a-zA-Z_][a-zA-Z0-9_\$.]*/
 
 %import common.SIGNED_NUMBER
 %import common.ESCAPED_STRING
