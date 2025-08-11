@@ -271,6 +271,7 @@ class ODataParser:
         if "$filter" in self.params:
             parser_filter = Lark(odata_filter_grammar, parser='lalr', transformer=ODataFilterTransformer())
             self.filter = parser_filter.parse(self.params["$filter"][0])
+            #print(self.filter)
 
         if "$orderby" in self.params:
             parser_orderby = Lark(odata_orderby_grammar, parser='lalr', transformer=ODataOrderByTransformer())

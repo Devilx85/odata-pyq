@@ -384,7 +384,7 @@ class PeeweeODataQuery:
         """ 
         #get first logical expression
         fk = next(iter(expression)) 
-        if fk == "and" or fk == "or":
+        if fk == "and" or fk == "or" or fk == "not":
             return self._filter_apply_expressions(fk,expression[fk])
 
         # Use a dictionary to map operators to their corresponding functions
@@ -437,17 +437,22 @@ class PeeweeODataQuery:
 
         """ 
         self.write_log(f"Applying filter expression { log_operator } for {expressions}")
-        left_expr = expressions[0]
-        right_expr = expressions[1]
-        
-        left_expr_res = self._filter_run_expression(left_expr)
-        right_expr_res = self._filter_run_expression(right_expr)
+
+        if log_operator  == "not":
+            left_expr = expressions
+            left_expr_res = self._filter_run_expression(left_expr)
+        else:
+            left_expr = expressions[0]
+            left_expr_res = self._filter_run_expression(left_expr)            
+            right_expr = expressions[1]
+            right_expr_res = self._filter_run_expression(right_expr)
 
         if log_operator == "and":
             return (left_expr_res & right_expr_res)
         elif log_operator == "or":
             return (left_expr_res | right_expr_res)
-
+        elif log_operator == "not":
+            return ~(left_expr_res)
         raise Exception(f"Unknown logical operator {log_operator}")
 
     def apply_select_model(self):
