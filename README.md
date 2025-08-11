@@ -30,7 +30,7 @@ A Python library that provides OData query parsing and seamless integration with
 - **DELETE** - Remove entities
 
 **IMPORTANT!**
-PeeweeODataQuery can be used only with single primary key, compound keys are not yet supported.
+PeeweeODataQuery can be used only with single primary key "id", compound keys are not yet supported.
 
 ### Advanced Features
 
@@ -290,7 +290,9 @@ Main class for executing OData operations on Peewee models.
 
 ## Etags and Odata id tags in result
 
-To correctly perform operation you need include always id, and set with_odata_id to Trur in peewee_result_to_dict_or_list. 
+To correctly include odata id tag in the result list you have to include always id field, and set with_odata_id parameter to 
+True in peewee_result_to_dict_or_list. 
+
 Etags you can generate out of model itself, providing in constructor etag_callable parameter. A good example is generating
 etag from id and last modification time or version. in this case both fields you need to select in the model via select_always
 list. This ensures that fields are always in the select statement, they will be hidden in case select query does not contain 
