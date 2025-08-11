@@ -13,7 +13,7 @@ A Python library that provides OData query parsing and seamless integration with
 - **$top** - Limit the number of results returned
 - **$skip** - Skip a specified number of results for pagination
 - **$count** - Request entity counts (currently only parser!)
-- **$search** - Full-text search support (currently only parser!)
+- **$search** - Full-text search support (currently only parser and no logical operations , just a string!)
 - **$format** - Specify response media type (currently only parser!)
 
 ### Filter Operations
