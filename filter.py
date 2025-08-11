@@ -36,6 +36,7 @@ odata_filter_grammar = r"""
          | SINGLE_QUOTED_STRING -> string
          | "true"             -> true
          | "false"            -> false
+         | "null"            -> null
 
     SINGLE_QUOTED_STRING: /'[^']*'/
 
@@ -82,12 +83,14 @@ class ODataFilterTransformer(Transformer):
     def string(self, token):
         return str(token)[1:-1]  # remove quotes
 
-    def true(self, _):
+    def true(self):
         return True
 
-    def false(self, _):
+    def false(self):
         return False
-
+    def null(self):
+        return None
+    
     def path(self, *parts):
         return "/".join(str(p) for p in parts)
 
