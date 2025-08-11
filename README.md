@@ -37,7 +37,7 @@ PeeweeODataQuery can be used only with single primary key "id", compound keys ar
 - Complex nested URL parsing with parentheses and ampersands
 - Foreign key and backref relationship navigation
 - Circular reference detection and prevention
-- Model access control via allowed objects list
+- Model access control via allowed objects to browse+modify and expand 
 - Comprehensive logging support
 - etag and odata id on-fly inclusion
 
