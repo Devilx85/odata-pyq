@@ -74,7 +74,7 @@ class Order(Model):
 #### Simple Query
 ```python
 # GET /users?$top=10&$skip=20
-query = PeeweeODataQuery([User], "/users?$top=10&$skip=20", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users?$top=10&$skip=20")
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
 
@@ -205,7 +205,7 @@ deleted_user = query.delete()
 ```python
 # Restrict access to specific models
 expandable = [User, Order]  # models list and only these models can be accessed or viewed. Expandable models cannot be modified and do not include eatags or odata ids
-query = PeeweeODataQuery([User], url, allowed_objects=allowed_models)
+query = PeeweeODataQuery([User], url, expandable=expandable)
 ```
 
 ### Logging
@@ -214,7 +214,7 @@ query = PeeweeODataQuery([User], url, allowed_objects=allowed_models)
 import logging
 
 logger = logging.getLogger(__name__)
-query = PeeweeODataQuery([User], url, allowed_objects=[User], logger=logger)
+query = PeeweeODataQuery([User], url,  logger=logger)
 ```
 
 ### Custom Field Values
