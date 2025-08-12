@@ -5,7 +5,7 @@ from typing import List, Tuple
 from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 from peewee import Model,ForeignKeyField,Field,DateField, DateTimeField
 
-from odata.filter import ODataPrimitve
+from odata.filter import ODataField, ODataFunction, ODataLogOperator, ODataOperator, ODataPrimitve
 from .odata_parser import ODataParser,ODataURLParser
 from logging import Logger
 from datetime import datetime
@@ -511,13 +511,23 @@ class PeeweeODataQuery:
             raise Exception(f"Invalid OData date format: {s}")
 
 
-    def _resolve_field(self,data:str):
+    def _resolve_field(self,field:ODataField):
+        """ Resolves field names (eg order/date)
+
+        Args:
+            data    ODataField with field name
+
+        """   
+        return self._resolve_field_name(field.name)
+
+    def _resolve_field_name(self,data:str):
         """ Resolves field names (eg order/date)
 
         Args:
             data    field name in relation to currently processed navigated class
 
         """   
+        
         self.write_log("Resolving name {data}")
 
         cur_class = self.navigated_class
@@ -585,9 +595,10 @@ class PeeweeODataQuery:
 
         """ 
         #get first logical expression
-        fk = next(iter(expression)) 
-        if fk == "and" or fk == "or" or fk == "not":
-            return self._filter_apply_expressions(fk,expression[fk])
+        if type(expression) == ODataLogOperator:
+            return self._filter_apply_log_expressions(expression)
+
+        
 
         # Use a dictionary to map operators to their corresponding functions
         operator_map = {
@@ -606,35 +617,36 @@ class PeeweeODataQuery:
         }
         
         #function or comparison?
-        if fk == "a":
-            if type(expression["a"]) == ODataPrimitve:
-                a =  self._resolve_value(expression["a"])
-            else:
-                a =self._resolve_field(expression["a"])
+        if type(expression) == ODataOperator:
+            self.write_log(f"Applying operator: {expression.name} with {expression.a},{expression.b}")
 
-            if type(expression["b"]) == ODataPrimitve:
-                b =  self._resolve_value(expression["b"])
+            if type(expression.a) == ODataPrimitve:
+                a =  self._resolve_value(expression.a)
             else:
-                b =self._resolve_field(expression["b"])
+                a =self._resolve_field(expression.a)
 
-            op = expression["op"]     
+            if type(expression.b) == ODataPrimitve:
+                b =  self._resolve_value(expression.b)
+            else:
+                b =self._resolve_field(expression.b)
+
+            op = expression.name    
             
             _is_a_dt = (isinstance(a, DateField) or isinstance(a, DateTimeField))
             _is_b_dt = (isinstance(b, DateField) or isinstance(b, DateTimeField))
             
-            if _is_a_dt and not _is_b_dt :
+            if _is_a_dt and type(b) == ODataPrimitve :
                 b = self._convert_str_to_dateandtime(b)
 
-            if _is_b_dt and not _is_a_dt :
+            if _is_b_dt and type(a) == ODataPrimitve :
                 a = self._convert_str_to_dateandtime(a)
 
             if op in operator_map:
-                self.write_log(f"Applying operator: {op}")
                 return operator_map[op](a, b)
             
-        elif fk == "function":
-            func = expression["function"]
-            args = expression["args"]
+        elif type(expression) == ODataFunction:
+            func = expression.name
+            args = expression.args
             self.write_log(f"Applying function: { func }")
             if len(args) != 2:
                 raise Exception(f"Function param error {func}") 
@@ -646,31 +658,31 @@ class PeeweeODataQuery:
                
         raise Exception(f"Unknown expression {expression} ")   
     
-    def _filter_apply_expressions(self,log_operator,expressions:List[dict]):
+    def _filter_apply_log_expressions(self,logoperator):
         """ Applies expresions for the logical operators AND and OR
 
         Args:
             expression    OData expressiion
 
         """ 
-        self.write_log(f"Applying filter expression { log_operator } for {expressions}")
+        self.write_log(f"Applying filter expression { logoperator.name }")
 
-        if log_operator  == "not":
-            left_expr = expressions
-            left_expr_res = self._filter_run_expression(left_expr)
+        if logoperator.name  == "not":
+            right_expr = logoperator.right
+            right_expr_res = self._filter_run_expression(right_expr)
         else:
-            left_expr = expressions[0]
+            left_expr = logoperator.left
             left_expr_res = self._filter_run_expression(left_expr)            
-            right_expr = expressions[1]
+            right_expr = logoperator.right
             right_expr_res = self._filter_run_expression(right_expr)
 
-        if log_operator == "and":
+        if logoperator.name == "and":
             return (left_expr_res & right_expr_res)
-        elif log_operator == "or":
+        elif logoperator.name == "or":
             return (left_expr_res | right_expr_res)
-        elif log_operator == "not":
-            return ~(left_expr_res)
-        raise Exception(f"Unknown logical operator {log_operator}")
+        elif logoperator.name == "not":
+            return ~(right_expr_res)
+        raise Exception(f"Unknown logical operator {logoperator.name}")
 
     def apply_select_model(self):
         """ Applies $select parameter
@@ -700,7 +712,7 @@ class PeeweeODataQuery:
         if self.parser.orderby:
             self.write_log(f"Applying sorting  { self.parser.orderby }")
             for field_name, direction in self.parser.orderby.items():
-                field = self._resolve_field(field_name)
+                field = self._resolve_field_name(field_name)
                 self.sorts.append(field.desc() if direction == 'desc' else field.asc())
 
     def apply_filter_model(self):
@@ -710,15 +722,22 @@ class PeeweeODataQuery:
             
 
         """ 
+        if not self.parser.filter:
+            return
+        
         odata_filter = self.parser.filter
-        self.write_log(f"Applying filter {self.parser.filter}")
+        
+        self.write_log(f"Applying filter {self.parser.filter.name}")
         if odata_filter:
-            fk = next(iter(odata_filter))
+            #fk = next(iter(odata_filter))
             expr = None
-            if fk == "and" or fk == "or":
-                expr = self._filter_apply_expressions(fk,odata_filter[fk])
-            else:
+            if type(odata_filter) == ODataLogOperator:
+                expr = self._filter_apply_log_expressions(odata_filter)
+            elif type(odata_filter) == ODataFunction or type(odata_filter) == ODataOperator:
                 expr = self._filter_run_expression(odata_filter)
+            else:
+                raise Exception(f"Wrong expression type in filter {odata_filter}")
+            
             self.where_cond.append(expr)
 
 

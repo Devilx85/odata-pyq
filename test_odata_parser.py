@@ -5,6 +5,8 @@ from datetime import datetime, date
 from peewee import *
 from unittest.mock import Mock
 
+from odata.filter import ODataLogOperator, ODataOperator
+
 # Assuming your package structure - adjust imports as needed
 from .odata_parser import ODataParser
 from .peewee_qodata import PeeweeODataQuery, DataType
@@ -138,10 +140,10 @@ class TestODataURLParser:
         parser.run()
         
         assert parser.filter is not None
-        assert "a" in parser.filter
-        assert parser.filter["a"] == "age"
-        assert parser.filter["op"] == "gt"
-        assert parser.filter["b"].value == 25
+        assert type(parser.filter) == ODataOperator
+        assert parser.filter.a.name == "age"
+        assert parser.filter.name == "gt"
+        assert parser.filter.b.value == 25
     
     def test_complex_filter_parsing(self):
         """Test complex $filter with AND/OR"""
@@ -149,8 +151,8 @@ class TestODataURLParser:
         parser.run()
         
         assert parser.filter is not None
-        assert "and" in parser.filter
-        assert len(parser.filter["and"]) == 2
+        assert type(parser.filter) == ODataLogOperator
+
     
     def test_select_parsing(self):
         """Test $select parameter parsing"""

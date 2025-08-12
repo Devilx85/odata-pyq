@@ -63,22 +63,43 @@ odata_filter_grammar = r"""
 class ODataPrimitve:
     def __init__(self,value):
         self.value = value
+
+class ODataFunction:
+    def __init__(self,name,args):
+        self.name = name
+        self.args = args
+
+class ODataField:
+    def __init__(self,name):
+        self.name = name
+
+class ODataOperator:
+    def __init__(self,name,a,b):
+        self.name = name
+        self.a = a
+        self.b = b
+class ODataLogOperator:
+    def __init__(self,name,left,right):
+        self.name = name
+        self.right = right
+        self.left = left
 @v_args(inline=True)
 class ODataFilterTransformer(Transformer):
     def and_expr(self, left, right):
-        return {"and": [left, right]}
+        return ODataLogOperator("and",left,right)
 
     def or_expr(self, left, right):
-        return {"or": [left, right]}
+        return ODataLogOperator("or",left,right)
 
     def not_expr(self, expr):
-        return {"not": expr}
+        return  ODataLogOperator("not",None,expr)
 
     def comparison_expr(self, field, op, value):
-        return {"a": field, "op": str(op), "b": value}
+        return ODataOperator(str(op),field,value)
 
     def function_call(self, name, args=None):
-        return {"function": str(name), "args": args if args else []}
+        args = args if args else []
+        return ODataFunction( str(name),args)
 
     def args(self, *expressions):
         return list(expressions)
@@ -110,4 +131,4 @@ class ODataFilterTransformer(Transformer):
         return "/".join(str(p) for p in parts)
 
     def field(self, value):
-        return value  # just pass through the transformed path
+        return ODataField(value)  # just pass through the transformed path
