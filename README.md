@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO_NAME/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO_NAME)
+[![codecov](https://codecov.io/gh/Devilx85/odata-pyq/branch/main/graph/badge.svg)](https://codecov.io/gh/Devilx85/odata-pyq)
 -----
 
 # OData Parser + Peewee Integration
