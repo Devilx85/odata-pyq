@@ -318,11 +318,12 @@ class PeeweeODataQuery:
         created_entry = self.navigated_class.create(**data)
 
         return created_entry
-    def update(self,data={},rewrite_filed_values={},default_field_values={},patch=False):   
+    def update(self,data={},where=[],rewrite_filed_values={},default_field_values={},patch=False):   
         """ Update entity (PUT/PATCH)
 
         Args:
             data                      dict of values for creation
+            where                     add "where" restriction e.g (User.id = 'user123')
             rewrite_filed_values      dict of fields to overwrite
             default_field_values      dict of default values
             patch                     Patching or full replace?
@@ -340,7 +341,7 @@ class PeeweeODataQuery:
             raise Exception(f"Can only update entities ,not collections!")
         
         #First execute a query to get udpated record
-        res_data = list(self.query())
+        res_data = list(self.query(where=where))
 
         if not res_data:
             raise Exception(f"Entiity does not exist")
@@ -380,9 +381,11 @@ class PeeweeODataQuery:
 
         return entity
 
-    def delete(self): 
+    def delete(self, where=[]): 
         """ Delete entity (PUT/PATCH)
 
+        Args:
+            where   "where" restricition conditions for deleteion
         """         
         if self.parser.has_parameters():
             raise Exception(f"Mutation does not support query parameters!")
@@ -395,7 +398,7 @@ class PeeweeODataQuery:
         if cur_navig.data_type != DataType.ENTITY:
             raise Exception(f"Can only update entities ,not collections!")
         
-        res_data = list(self.query())
+        res_data = list(self.query(where=where))
 
         if not res_data:
             raise Exception(f"Entiity does not exist")
