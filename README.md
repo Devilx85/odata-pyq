@@ -2,7 +2,7 @@ Based on your request, I will integrate the detailed explanation of the `ODataPa
 
 -----
 
-# OData Peewee Integration
+# OData Parser + Peewee Integration
 
 A comprehensive Python library that provides OData v4 query parsing and seamless integration with Peewee ORM, enabling RESTful API endpoints with full OData query capabilities.
 
