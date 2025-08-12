@@ -251,7 +251,7 @@ class PeeweeODataQuery:
                     if field_object.rel_model not in self.joins:
                         self.joins.append(field_object.rel_model)
 
-        query = self.navigated_class.select(*select)
+        query = self.navigated_class.select(*select).distinct()
 
         if self.joins:
             query = query.join(*self.joins)
