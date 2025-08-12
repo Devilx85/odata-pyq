@@ -86,14 +86,16 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```
 You can add some options before triggering results:
 ```python
-query.set_search_fields(["email","description"]) #$search will trigger "contains" function for model fields to be included in "where"
+#$search will trigger "contains" function for model fields while rendering "where" part
+query.set_search_fields(["email","description"]) 
 ```
 
 ```python
 query.set_skiptoken(100) #Max lines in the result
 ```
 ```python
-query.set_hidden_fields(["password_hash"]) *Fields will not be visible even if included in $select
+#Fields will not be visible even if included in $select
+query.set_hidden_fields(["password_hash"]) 
 ```
 
 #### Filtering
