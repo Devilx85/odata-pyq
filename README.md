@@ -1,4 +1,4 @@
-Based on your request, I will integrate the detailed explanation of the `ODataParser` class and its filtering examples into the previously generated `README.md` file.
+Here is a description of the filter structure based on the provided Python classes, which I will now integrate into the previously generated README file.
 
 -----
 
@@ -10,42 +10,42 @@ A comprehensive Python library that provides OData v4 query parsing and seamless
 
 ### Complete OData v4 Query Support
 
-  - **$filter** - Advanced filtering with Boolean conditions and logical operators (AND/OR/NOT)
-  - **$select** - Field selection with comma-separated lists
-  - **$expand** - Include related entities inline with support for nested parameters and sub-queries
-  - **$orderby** - Multi-field sorting with ascending/descending directions
-  - **$top** - Result limiting for pagination
-  - **$skip** - Offset-based pagination
-  - **$skiptoken** - Server-side pagination with automatic next-link generation
-  - **$count** - Entity count requests
-  - **$search** - Full-text search across specified fields
-  - **$format** - Response media type specification (parser support)
+  - **$filter** - Advanced filtering with Boolean conditions and logical operators (AND/OR/NOT).
+  - **$select** - Field selection with comma-separated lists.
+  - **$expand** - Include related entities inline with support for nested parameters and sub-queries.
+  - **$orderby** - Multi-field sorting with ascending/descending directions.
+  - **$top** - Result limiting for pagination.
+  - **$skip** - Offset-based pagination.
+  - **$skiptoken** - Server-side pagination with automatic next-link generation.
+  - **$count** - Entity count requests.
+  - **$search** - Full-text search across specified fields.
+  - **$format** - Response media type specification (parser support).
 
 ### Advanced Filtering Capabilities
 
-  - **Comparison operators**: `eq`, `ne`, `gt`, `lt`, `ge`, `le`
-  - **String functions**: `contains()`, `startswith()`, `endswith()`
-  - **Logical operators**: `and`, `or`, `not`
-  - **Complex nested expressions** with parentheses
-  - **Field navigation** through relationships (e.g., `order/customer/name`)
+  - **Comparison operators**: `eq`, `ne`, `gt`, `lt`, `ge`, `le`.
+  - **String functions**: `contains()`, `startswith()`, `endswith()`.
+  - **Logical operators**: `and`, `or`, `not`.
+  - **Complex nested expressions** with parentheses.
+  - **Field navigation** through relationships (e.g., `order/customer/name`).
 
 ### Full CRUD Operations
 
-  - **GET** - Query entities with complete OData parameter support
-  - **POST** - Create new entities with relationship handling
-  - **PUT/PATCH** - Update existing entities (full or partial updates)
-  - **DELETE** - Remove entities with proper validation
+  - **GET** - Query entities with complete OData parameter support.
+  - **POST** - Create new entities with relationship handling.
+  - **PUT/PATCH** - Update existing entities (full or partial updates).
+  - **DELETE** - Remove entities with proper validation.
 
 ### Enterprise-Ready Features
 
-  - **Relationship Navigation** - Foreign keys and backref traversal
-  - **Circular Reference Protection** - Automatic detection and prevention
-  - **Access Control** - Model-level permissions for Browse, modification, and expansion
-  - **Comprehensive Logging** - Full operation tracking and debugging
-  - **ETag Support** - Optimistic concurrency control
-  - **OData Metadata** - Automatic CSDL/XML metadata generation
-  - **Hidden Fields** - Security through field visibility control
-  - **Search Integration** - Configurable full-text search across model fields
+  - **Relationship Navigation** - Foreign keys and backref traversal.
+  - **Circular Reference Protection** - Automatic detection and prevention.
+  - **Access Control** - Model-level permissions for Browse, modification, and expansion.
+  - **Comprehensive Logging** - Full operation tracking and debugging.
+  - **ETag Support** - Optimistic concurrency control.
+  - **OData Metadata** - Automatic CSDL/XML metadata generation.
+  - **Hidden Fields** - Security through field visibility control.
+  - **Search Integration** - Configurable full-text search across model fields.
 
 -----
 
@@ -236,24 +236,44 @@ After parsing, the `ODataParser` populates its internal attributes with the stru
   - `self.top`, `self.skip`: Integers for pagination limits and offsets.
   - `self.count`: A boolean indicating whether a count is requested.
 
-### Filtering Examples with `ODataParser`
+### Filter Expression Structure
 
-The `$filter` parameter is handled by a dedicated Lark-based parser, which transforms the filter string into an expression tree. This tree-like structure is then used by `PeeweeODataQuery` to build the Peewee `WHERE` clause.
+The `ODataParser` and its `ODataFilterTransformer` convert a `$filter` string into a structured object that represents the logical tree of the expression. The structure is composed of several custom classes:
+
+  - **`ODataLogOperator`**: Represents a logical operation (`and`, `or`, `not`). It has `left` and `right` attributes that hold other expressions, allowing for nested logic. For a `not` operator, only the `right` attribute is used.
+  - **`ODataOperator`**: Represents a comparison operation (`eq`, `ne`, `gt`, `lt`, `ge`, `le`). It has attributes `a` and `b` for the two sides of the comparison, which can be fields, values, or other expressions.
+  - **`ODataFunction`**: Represents a function call, such as `contains`, `startswith`, or `endswith`. It stores the function `name` and a list of `args`.
+  - **`ODataField`**: Represents a field or property name within the filter expression.
+  - **`ODataPrimitve`**: Represents a literal value like a string, number, boolean, or `null`.
+
+This tree-like structure enables the `PeeweeODataQuery` to recursively traverse the expression and build the corresponding Peewee `where` conditions.
 
 #### Example 1: Simple Equality
 
 **OData URL:** `/users?$filter=name eq 'John'`
-The parser outputs a structured object representing the comparison `name eq 'John'`.
+The parser outputs an `ODataOperator` object with:
+
+  - `name`: `'eq'`
+  - `a`: `ODataField` with `name='name'`
+  - `b`: `ODataPrimitve` with `value='John'`
 
 #### Example 2: Logical Operators
 
 **OData URL:** `/products?$filter=price gt 50 and stock gt 10`
-The parser correctly builds an expression tree with `"and"` as the top-level operator, with the `price` and `stock` comparisons as its children.
+The parser outputs an `ODataLogOperator` object with:
+
+  - `name`: `'and'`
+  - `left`: an `ODataOperator` for `price gt 50`
+  - `right`: an `ODataOperator` for `stock gt 10`
 
 #### Example 3: Nested Expressions and Functions
 
 **OData URL:** `/users?$filter=contains(name,'smith') or endswith(email,'.com')`
-The parser produces a top-level `"or"` operator, with `ODataFunction` objects for `contains` and `endswith` as its arguments.
+The parser outputs an `ODataLogOperator` object with:
+
+  - `name`: `'or'`
+  - `left`: an `ODataFunction` for `contains`
+  - `right`: an `ODataFunction` for `endswith`
 
 ### Query Processing Pipeline
 
