@@ -12,8 +12,9 @@ A Python library that provides OData query parsing and seamless integration with
 - **$orderby** - Sort results by one or more properties
 - **$top** - Limit the number of results returned
 - **$skip** - Skip a specified number of results for pagination
+- **$skiptoken** - Server side pagination
 - **$count** - Request entity counts (currently only parser!)
-- **$search** - Full-text search support (currently only parser and no logical operations , just a string!)
+- **$search** - Full-text search support (currently implemnted as contains operator in peewee query via the list of provided fields)
 - **$format** - Specify response media type (currently only parser!)
 
 ### Filter Operations
