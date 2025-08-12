@@ -60,7 +60,9 @@ odata_filter_grammar = r"""
     %import common.WS
     %ignore WS
 """
-
+class ODataPrimitve:
+    def __init__(self,value):
+        self.value = value
 @v_args(inline=True)
 class ODataFilterTransformer(Transformer):
     def and_expr(self, left, right):
@@ -73,7 +75,7 @@ class ODataFilterTransformer(Transformer):
         return {"not": expr}
 
     def comparison_expr(self, field, op, value):
-        return {"field": field, "op": str(op), "value": value}
+        return {"a": field, "op": str(op), "b": value}
 
     def function_call(self, name, args=None):
         return {"function": str(name), "args": args if args else []}
@@ -85,25 +87,24 @@ class ODataFilterTransformer(Transformer):
         return str(token)
 
     def number(self, token):
-        return float(token)
+        return ODataPrimitve(float(token))
 
     def string(self, token):
         text = str(token)
-        
         if text.startswith('"'):
-            return ast.literal_eval(text)  # handles \" correctly
+            return ODataPrimitve(ast.literal_eval(text))  # handles \" correctly
         elif text.startswith("'"):
             # Remove outer quotes and replace doubled single quotes with one
-            return text[1:-1].replace("''", "'")
+            return ODataPrimitve(text[1:-1].replace("''", "'"))
 
 
     def true(self):
-        return True
+        return ODataPrimitve(True)
 
     def false(self):
-        return False
+        return ODataPrimitve(False)
     def null(self):
-        return None
+        return ODataPrimitve(None)
     
     def path(self, *parts):
         return "/".join(str(p) for p in parts)

@@ -138,10 +138,10 @@ class TestODataURLParser:
         parser.run()
         
         assert parser.filter is not None
-        assert "field" in parser.filter
-        assert parser.filter["field"] == "age"
+        assert "a" in parser.filter
+        assert parser.filter["a"] == "age"
         assert parser.filter["op"] == "gt"
-        assert parser.filter["value"] == 25
+        assert parser.filter["b"].value == 25
     
     def test_complex_filter_parsing(self):
         """Test complex $filter with AND/OR"""
@@ -198,6 +198,10 @@ class TestODataURLParser:
         parser.run()
         
         assert parser.search == "john"
+    def test_complex_request(self):
+        """Test several parameters together"""
+        parser = ODataParser("http://localhost/api/?$filter=users/id gt 7&$expand=users($select=id,email;$filter=not(contains(email,'x')) and created_at gt '2025-08-01T10:10:57';$orderby=id desc)&$top=1&$skip=0")
+        parser.run()
 
 class TestPeeweeODataQuery:
     """Test Peewee OData integration"""
@@ -224,7 +228,7 @@ class TestPeeweeODataQuery:
     def test_filter_query(self):
         """Test query with $filter"""
         models = [User, Order, Product, OrderItem]
-        query_obj = PeeweeODataQuery(models, "/users?$filter=age gt 30")
+        query_obj = PeeweeODataQuery(models, "/users?$filter=30 lt age")
         result = list(query_obj.query())
         
         assert len(result) == 1

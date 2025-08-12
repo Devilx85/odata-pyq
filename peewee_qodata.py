@@ -4,6 +4,8 @@ from operator import and_
 from typing import List, Tuple
 from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 from peewee import Model,ForeignKeyField,Field,DateField, DateTimeField
+
+from odata.filter import ODataPrimitve
 from .odata_parser import ODataParser,ODataURLParser
 from logging import Logger
 from datetime import datetime
@@ -571,7 +573,9 @@ class PeeweeODataQuery:
         return field
     
     def _resolve_value(self,data):
-        return data
+        if type(data) == ODataPrimitve:
+            return data.value
+        raise Exception("Cannot detect type of {data}")
     
     def _filter_run_expression(self,expression):
         """ Resolves OData expression recieved from parser (see Odata parser)
@@ -602,17 +606,31 @@ class PeeweeODataQuery:
         }
         
         #function or comparison?
-        if fk == "field":
-           
-            field = self._resolve_field(expression["field"])
-            value = self._resolve_value(expression["value"])
+        if fk == "a":
+            if type(expression["a"]) == ODataPrimitve:
+                a =  self._resolve_value(expression["a"])
+            else:
+                a =self._resolve_field(expression["a"])
+
+            if type(expression["b"]) == ODataPrimitve:
+                b =  self._resolve_value(expression["b"])
+            else:
+                b =self._resolve_field(expression["b"])
+
             op = expression["op"]     
-            if isinstance(field, DateField) or isinstance(field, DateTimeField):
-                value = self._convert_str_to_dateandtime(value)
+            
+            _is_a_dt = (isinstance(a, DateField) or isinstance(a, DateTimeField))
+            _is_b_dt = (isinstance(b, DateField) or isinstance(b, DateTimeField))
+            
+            if _is_a_dt and not _is_b_dt :
+                b = self._convert_str_to_dateandtime(b)
+
+            if _is_b_dt and not _is_a_dt :
+                a = self._convert_str_to_dateandtime(a)
 
             if op in operator_map:
                 self.write_log(f"Applying operator: {op}")
-                return operator_map[op](field, value)
+                return operator_map[op](a, b)
             
         elif fk == "function":
             func = expression["function"]

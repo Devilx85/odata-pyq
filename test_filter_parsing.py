@@ -13,10 +13,10 @@ class TestFilterParsing:
     def test_simple_eq_filter(self, parser):
         """Test simple equality filter"""
         result = parser.parse("name eq 'John'")
-        
-        assert result["field"] == "name"
+        print(result)
+        assert result["a"] == "name"
         assert result["op"] == "eq"
-        assert result["value"] == "John"
+        assert result["b"].value == "John"
     
     def test_numeric_comparison(self, parser):
         """Test numeric comparisons"""
@@ -31,20 +31,20 @@ class TestFilterParsing:
         for filter_expr, expected_op, expected_value in test_cases:
             result = parser.parse(filter_expr)
             assert result["op"] == expected_op
-            assert result["value"] == expected_value
+            assert result["b"].value == expected_value
     
     def test_boolean_values(self, parser):
         """Test boolean value parsing"""
         true_result = parser.parse("is_active eq true")
         false_result = parser.parse("is_deleted eq false")
         
-        assert true_result["value"] is True
-        assert false_result["value"] is False
+        assert true_result["b"].value is True
+        assert false_result["b"].value is False
     
     def test_null_value(self, parser):
         """Test null value parsing"""
         result = parser.parse("description eq null")
-        assert result["value"] is None
+        assert result["b"].value is None
     
     def test_string_functions(self, parser):
         """Test string functions"""
@@ -62,22 +62,22 @@ class TestFilterParsing:
     
     def test_and_expression(self, parser):
         """Test AND logical expression"""
-        result = parser.parse("age gt 18 and is_active eq true")
+        result = parser.parse("18 gt age and is_active eq true")
         
         assert "and" in result
         assert len(result["and"]) == 2
         
         # First condition
         first = result["and"][0]
-        assert first["field"] == "age"
+        assert first["a"].value == 18.0 
         assert first["op"] == "gt"
-        assert first["value"] == 18.0
+        assert first["b"] == "age"
         
         # Second condition
         second = result["and"][1]
-        assert second["field"] == "is_active"
+        assert second["a"] == "is_active"
         assert second["op"] == "eq"
-        assert second["value"] is True
+        assert second["b"].value is True
     
     def test_or_expression(self, parser):
         """Test OR logical expression"""
@@ -92,9 +92,9 @@ class TestFilterParsing:
         
         assert "not" in result
         inner = result["not"]
-        assert inner["field"] == "is_deleted"
+        assert inner["a"] == "is_deleted"
         assert inner["op"] == "eq"
-        assert inner["value"] is True
+        assert inner["b"].value is True
     
     def test_complex_expression(self, parser):
         """Test complex nested expressions"""
@@ -109,29 +109,29 @@ class TestFilterParsing:
         
         # Right side should be simple comparison
         right = result["or"][1]
-        assert right["field"] == "is_vip"
+        assert right["a"] == "is_vip"
     
     def test_path_expressions(self, parser):
         """Test nested field paths"""
         result = parser.parse("user/name eq 'John'")
         
-        assert result["field"] == "user/name"
+        assert result["a"] == "user/name"
         assert result["op"] == "eq"
-        assert result["value"] == "John"
+        assert result["b"].value == "John"
     
     def test_single_quoted_strings(self, parser):
         """Test single-quoted string values"""
         result = parser.parse("name eq 'John O''Brian'")
         
-        assert result["field"] == "name"
-        assert result["value"] == "John O'Brian"
+        assert result["a"] == "name"
+        assert result["b"].value == "John O'Brian"
     
     def test_double_quoted_strings(self, parser):
         """Test double-quoted string values"""
         result = parser.parse('description eq "Product with \\"quotes\\""')
         
-        assert result["field"] == "description"
-        assert result["value"] == 'Product with "quotes"'
+        assert result["a"] == "description"
+        assert result["b"].value == 'Product with "quotes"'
     
     def test_function_with_multiple_args(self, parser):
         """Test functions with multiple arguments"""
@@ -142,7 +142,7 @@ class TestFilterParsing:
         assert result["function"] == "contains"
         assert len(result["args"]) == 2
         assert result["args"][0] == "description"
-        assert result["args"][1] == "test"
+        assert result["args"][1].value == "test"
     
     def test_precedence(self, parser):
         """Test operator precedence"""
