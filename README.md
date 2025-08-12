@@ -1,4 +1,5 @@
 [![codecov](https://codecov.io/gh/Devilx85/odata-pyq/branch/main/graph/badge.svg)](https://codecov.io/gh/Devilx85/odata-pyq)
+[![Python Tests and Badge](https://github.com/Devilx85/odata-pyq/actions/workflows/python-app.yml/badge.svg)](https://github.com/Devilx85/odata-pyq/actions/workflows/python-app.yml)
 -----
 
 # OData Parser + Peewee Integration
