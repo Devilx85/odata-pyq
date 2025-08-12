@@ -222,7 +222,7 @@ deleted_user = query.delete()
 url = "/users?$filter=(age gt 18 and age lt 65) and (contains(name,'John') or contains(email,'john'))"
 
 # Date-based filtering
-url = "/orders?$filter=created_date ge 2023-01-01T00:00:00Z and amount gt 100"
+url = "/orders?$filter=created_date ge '2023-01-01T00:00:00Z' and amount gt 100"
 
 ```
 
