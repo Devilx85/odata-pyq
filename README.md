@@ -224,18 +224,16 @@ url = "/users?$filter=(age gt 18 and age lt 65) and (contains(name,'John') or co
 # Date-based filtering
 url = "/orders?$filter=created_date ge 2023-01-01T00:00:00Z and amount gt 100"
 
-# Relationship filtering
-url = "/users?$filter=orders/any(o: o/amount gt 1000)"
 ```
 
 ### Multi-Level Expansion
 
 ```python
 # Deep relationship expansion
-url = "/users?$expand=orders($expand=items($select=name,price;$orderby=price desc))"
+url = "/users?$expand=orders($expand=items($select=name,price&$orderby=price desc))"
 
 # Conditional expansion
-url = "/customers?$expand=orders($filter=status eq 'active';$expand=items)"
+url = "/customers?$expand=orders($filter=status eq 'active'&$expand=items)"
 ```
 
 ### Metadata Generation
@@ -284,9 +282,6 @@ We welcome contributions! Please ensure:
 3. **Performance** - Consider performance implications of changes
 4. **Backward Compatibility** - Maintain API compatibility where possible
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 📞 Support
 
