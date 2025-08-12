@@ -329,3 +329,4 @@ Contributions are welcome! Please ensure:
 ## Support
 
 For issues and questions, please use the GitHub issue tracker or contact the maintainers.
+lmartynov@tuta.com
