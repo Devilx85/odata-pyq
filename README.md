@@ -12,8 +12,9 @@ A Python library that provides OData query parsing and seamless integration with
 - **$orderby** - Sort results by one or more properties
 - **$top** - Limit the number of results returned
 - **$skip** - Skip a specified number of results for pagination
-- **$count** - Request entity counts (currently only parser!)
-- **$search** - Full-text search support (currently only parser and no logical operations , just a string!)
+- **$skiptoken** - Server side pagination
+- **$count** - Request entity counts
+- **$search** - Full-text search support (currently implemnted as contains operator in peewee query via the list of provided fields)
 - **$format** - Specify response media type (currently only parser!)
 
 ### Filter Operations
@@ -82,6 +83,19 @@ class Order(Model):
 # GET /users?$top=10&$skip=20
 query = PeeweeODataQuery([User], "/users?$top=10&$skip=20")
 results = query.peewee_result_to_dict_or_list(query.query())
+```
+You can add some options before triggering results:
+```python
+#$search will trigger "contains" function for model fields while rendering "where" part
+query.set_search_fields(["email","description"]) 
+```
+
+```python
+query.set_skiptoken(100) #Max lines in the result
+```
+```python
+#Fields will not be visible even if included in $select
+query.set_hidden_fields(["password_hash"]) 
 ```
 
 #### Filtering
@@ -210,7 +224,8 @@ deleted_user = query.delete()
 
 ```python
 # Restrict access to specific models
-expandable = [User, Order]  # models list and only these models can be accessed or viewed. Expandable models cannot be modified and do not include eatags or odata ids
+# Expandable models cannot be modified and do not include eatags or odata ids
+expandable = [User, Order]  
 query = PeeweeODataQuery([User], url, expandable=expandable)
 ```
 
@@ -314,3 +329,4 @@ Contributions are welcome! Please ensure:
 ## Support
 
 For issues and questions, please use the GitHub issue tracker or contact the maintainers.
+lmartynov@tuta.com
