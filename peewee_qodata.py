@@ -116,6 +116,9 @@ class PeeweeODataQuery:
         #Search fiedls
         self.search_fields = []
 
+        #model related restrictions
+        self.restrictions = {}
+
         self.apply_navigation_model()
 
     def set_expand_complex(self,expand:bool):
@@ -186,6 +189,14 @@ class PeeweeODataQuery:
 
             self.where_cond = [final_cond]
 
+    def add_restricition(self,model,where_conds=[]):
+        """ Adds restrictive "where" conditions for the model
+
+        Args:
+            model           model class for restricitions
+            where_conds     list of peewee "where" conditions
+        """             
+        self.restrictions[model.__name__] = where_conds
 
     def query(self,where=[],join=[]):
         """ Execute Query (GET)
@@ -224,6 +235,9 @@ class PeeweeODataQuery:
         self.where_cond.extend(self.path_classes[-1].where) 
 
         self.where_cond.extend(where)
+        if self.navigated_class.__name__ in self.restrictions:
+            self.where_cond.extend(self.restrictions[self.navigated_class.__name__])
+
         self.joins.extend(join)
         
         self.write_log(f"Query : sel {self.navigated_class} {select} join {self.joins} where {self.where_cond} with fetch {backrefs}")
