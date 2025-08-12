@@ -1,62 +1,57 @@
-# OData Parser & Peewee Integration
+# OData Peewee Integration
 
-A Python library that provides OData query parsing and seamless integration with Peewee ORM, enabling RESTful API endpoints with OData query capabilities.
+A comprehensive Python library that provides OData v4 query parsing and seamless integration with Peewee ORM, enabling RESTful API endpoints with full OData query capabilities.
 
-## Features
+## 🚀 Features
 
-### OData Query Support
+### Complete OData v4 Query Support
 
-- **$filter** - Filter results with Boolean conditions and logical operators (AND/OR)
-- **$select** - Choose specific fields to include in responses (supported only as sinmple list , separated by comma)
-- **$expand** - Include related entities inline (supports nested parameters)
-- **$orderby** - Sort results by one or more properties
-- **$top** - Limit the number of results returned
-- **$skip** - Skip a specified number of results for pagination
-- **$skiptoken** - Server side pagination
-- **$count** - Request entity counts
-- **$search** - Full-text search support (currently implemnted as contains operator in peewee query via the list of provided fields)
-- **$format** - Specify response media type (currently only parser!)
+- **$filter** - Advanced filtering with Boolean conditions and logical operators (AND/OR/NOT)
+- **$select** - Field selection with comma-separated lists
+- **$expand** - Include related entities inline with support for nested parameters and sub-queries
+- **$orderby** - Multi-field sorting with ascending/descending directions
+- **$top** - Result limiting for pagination
+- **$skip** - Offset-based pagination
+- **$skiptoken** - Server-side pagination with automatic next-link generation
+- **$count** - Entity count requests
+- **$search** - Full-text search across specified fields
+- **$format** - Response media type specification (parser support)
 
-### Filter Operations
+### Advanced Filtering Capabilities
 
 - **Comparison operators**: `eq`, `ne`, `gt`, `lt`, `ge`, `le`
 - **String functions**: `contains()`, `startswith()`, `endswith()`
-- **Logical operators**: `and`, `or`,`not`
+- **Logical operators**: `and`, `or`, `not`
+- **Complex nested expressions** with parentheses
+- **Field navigation** through relationships (e.g., `order/customer/name`)
 
-### CRUD Operations
+### Full CRUD Operations
 
-- **GET** - Query entities with full OData parameter support
-- **POST** - Create new entities
-- **PUT/PATCH** - Update existing entities
-- **DELETE** - Remove entities
+- **GET** - Query entities with complete OData parameter support
+- **POST** - Create new entities with relationship handling
+- **PUT/PATCH** - Update existing entities (full or partial updates)
+- **DELETE** - Remove entities with proper validation
 
-**IMPORTANT!**
-PeeweeODataQuery can be used only with single primary key "id", compound keys are not yet supported.
+### Enterprise-Ready Features
 
-### Advanced Features
+- **Relationship Navigation** - Foreign keys and backref traversal
+- **Circular Reference Protection** - Automatic detection and prevention
+- **Access Control** - Model-level permissions for browsing, modification, and expansion
+- **Comprehensive Logging** - Full operation tracking and debugging
+- **ETag Support** - Optimistic concurrency control
+- **OData Metadata** - Automatic CSDL/XML metadata generation
+- **Hidden Fields** - Security through field visibility control
+- **Search Integration** - Configurable full-text search across model fields
 
-- Complex nested URL parsing with parentheses and ampersands
-- Foreign key and backref relationship navigation
-- Circular reference detection and prevention
-- Model access control via allowed objects to browse+modify and expand 
-- Comprehensive logging support
-- etag and odata id on-fly inclusion
-
-## Installation
+## 📦 Installation
 
 ```bash
 pip install peewee lark
 ```
 
-## Quick Start
+## 🏃‍♂️ Quick Start
 
-**IMPORTANT!**
-Model's navigation starts with any provided class in "models" parameter of the constructor. 
-Name of the path should starts with class name in lowercase + "s".
-Exmaple: class User will be searched as "users" in the query path start. 
-ForeignKey fields and backrefs can be navigated if class is listed in models or in expandable parameter.
-
-### Basic Setup
+### Model Definition
 
 ```python
 from peewee import *
@@ -68,6 +63,7 @@ class User(Model):
     name = CharField()
     email = CharField()
     age = IntegerField()
+    created_date = DateTimeField()
     
 class Order(Model):
     user = ForeignKeyField(User, backref='orders')
@@ -76,118 +72,96 @@ class Order(Model):
     created_date = DateTimeField()
 ```
 
-### Query Examples
+### Basic Queries
 
-#### Simple Query
 ```python
+# Simple pagination
 # GET /users?$top=10&$skip=20
 query = PeeweeODataQuery([User], "/users?$top=10&$skip=20")
-results = query.peewee_result_to_dict_or_list(query.query())
-```
-You can add some options before triggering results:
-```python
-#$search will trigger "contains" function for model fields while rendering "where" part
-query.set_search_fields(["email","description"]) 
+results = query.to_odata_response(query.query())
+
+# Advanced filtering
+# GET /users?$filter=age gt 25 and contains(name,'john')
+query = PeeweeODataQuery([User], "/users?$filter=age gt 25 and contains(name,'john')")
+results = query.to_odata_response(query.query())
+
+# Field selection with sorting
+# GET /users?$select=name,email&$orderby=created_date desc
+query = PeeweeODataQuery([User], "/users?$select=name,email&$orderby=created_date desc")
+results = query.to_odata_response(query.query())
 ```
 
-```python
-query.set_skiptoken(100) #Max lines in the result
-```
-```python
-#Fields will not be visible even if included in $select
-query.set_hidden_fields(["password_hash"]) 
-```
+### Relationship Expansion
 
-to prevent auto expanding of foreignkey fields (complex entity)
 ```python
-query.set_expand_complex(False) # id instead of sub-entity
-```
+# Simple expansion
+# GET /users?$expand=orders
+query = PeeweeODataQuery([User], "/users?$expand=orders", expandable=[Order])
+results = query.to_odata_response(query.query())
 
-#### Filtering
-```python
-# GET /users?$filter=age gt 25 and name eq 'John'
+# Nested expansion with sub-queries
+# GET /users?$expand=orders($filter=amount gt 100;$orderby=created_date desc;$top=5)
 query = PeeweeODataQuery(
     [User], 
-    "/users?$filter=age gt 25 and name eq 'John'"
-)
-results = query.peewee_result_to_dict_or_list(query.query())
-```
-
-#### String Functions
-```python
-# GET /users?$filter=contains(name,'john')
-query = PeeweeODataQuery(
-    [User],
-    "/users?$filter=contains(name,'john')"
-)
-results = query.peewee_result_to_dict_or_list(query.query())
-```
-
-#### Field Selection
-```python
-# GET /users?$select=name,email
-query = PeeweeODataQuery(
-    [User],
-    "/users?$select=name,email"
-)
-results = query.peewee_result_to_dict_or_list(query.query())
-```
-
-#### Sorting
-```python
-# GET /users?$orderby=age desc,name asc
-query = PeeweeODataQuery(
-    [User],
-    "/users?$orderby=age desc,name asc"
-)
-results = query.peewee_result_to_dict_or_list(query.query())
-```
-
-#### Expanding Related Entities
-```python
-# GET /users?$expand=orders
-query = PeeweeODataQuery(
-    [User],
-    "/users?$expand=orders",
-    expandable=[Order]   #Can be expanded but not navigated from root/or modified
-)
-results = query.peewee_result_to_dict_or_list(query.query())
-```
-
-#### Nested Expand with Parameters
-```python
-# GET /users?$expand=orders($filter=amount gt 100;$orderby=created_date desc)
-query = PeeweeODataQuery(
-    [User],
-    "/users?$expand=orders($filter=amount gt 100;$orderby=created_date desc)",
+    "/users?$expand=orders($filter=amount gt 100;$orderby=created_date desc;$top=5)",
     expandable=[Order]
 )
-results = results = query.peewee_result_to_dict_or_list(query.query())(query.query())
+results = query.to_odata_response(query.query())
 ```
 
-### Navigation Examples
+### Navigation and Entity Access
 
-#### Entity by ID
 ```python
+# Access specific entity
 # GET /users(123)
 query = PeeweeODataQuery([User], "/users(123)")
-user = query.peewee_result_to_dict_or_list(query.query())
+user = query.to_odata_response(query.query())
+
+# Navigate relationships
+# GET /users(123)/orders?$filter=amount gt 50
+query = PeeweeODataQuery([User], "/users(123)/orders?$filter=amount gt 50", expandable=[Order])
+orders = query.to_odata_response(query.query())
 ```
 
-#### Related Entity Navigation
+## 🔧 Advanced Configuration
+
+### Security and Access Control
+
 ```python
-# GET /users(123)/orders
-query = PeeweeODataQuery(
-    [User], 
-    "/users(123)/orders",
-    expandable=[ Order]
-)
-orders = query.peewee_result_to_dict_or_list(query.query())
+# Configure expandable models (read-only access)
+expandable = [Order, Product]  # Can be expanded but not modified directly
+query = PeeweeODataQuery([User], url, expandable=expandable)
+
+# Hide sensitive fields
+query.set_hidden_fields(['password_hash', 'internal_notes'])
+
+# Configure search fields for $search parameter
+query.set_search_fields(['name', 'email', 'description'])
 ```
 
-### CRUD Operations
+### Server-Side Pagination
 
-#### Create Entity
+```python
+# Enable automatic pagination with skip tokens
+query.set_skiptoken(100)  # Max 100 records per page
+results = query.to_odata_response(query.query())
+# Automatically includes @odata.nextLink when more data available
+```
+
+### Logging and Debugging
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+query = PeeweeODataQuery([User], url, logger=logger)
+# Comprehensive logging of query construction and execution
+```
+
+## 🔨 CRUD Operations
+
+### Create Entity
+
 ```python
 # POST /users
 query = PeeweeODataQuery([User], "/users")
@@ -195,143 +169,131 @@ new_user = query.create({
     'name': 'John Doe',
     'email': 'john@example.com',
     'age': 30
-})
+}, default_field_values={'status': 'active'})
 ```
 
-#### Update Entity (PUT)
+### Update Operations
+
 ```python
-# PUT /users(123)
+# Full update (PUT)
 query = PeeweeODataQuery([User], "/users(123)")
 updated_user = query.update({
     'name': 'John Smith',
     'email': 'johnsmith@example.com',
     'age': 31
 })
-```
 
-#### Partial Update (PATCH)
-```python
-# PATCH /users(123)
-query = PeeweeODataQuery([User], "/users(123)")
+# Partial update (PATCH)
 updated_user = query.update({'age': 32}, patch=True)
 ```
 
-#### Delete Entity
+### Delete Entity
+
 ```python
 # DELETE /users(123)
 query = PeeweeODataQuery([User], "/users(123)")
 deleted_user = query.delete()
 ```
 
-## Advanced Usage
+## 🏗️ Architecture
 
-### Security and Access Control
+### Core Components
+
+- **ODataParser** - Robust URL and query parameter parsing using Lark grammar
+- **PeeweeODataQuery** - Main query execution engine with relationship handling
+- **NavigationPath** - Path resolution and relationship traversal
+- **PeeweeODataMeta** - Automatic OData metadata generation
+
+### Query Processing Pipeline
+
+1. **URL Parsing** - Extract OData parameters and navigation paths
+2. **Model Resolution** - Resolve entity types and relationships
+3. **Security Validation** - Apply access controls and permissions
+4. **Query Construction** - Build Peewee queries with joins and filters
+5. **Result Processing** - Format results with OData conventions
+6. **Response Generation** - Include metadata, etags, and pagination links
+
+## 📊 Advanced Examples
+
+### Complex Filtering
 
 ```python
-# Restrict access to specific models
-# Expandable models cannot be modified and do not include eatags or odata ids
-expandable = [User, Order]  
-query = PeeweeODataQuery([User], url, expandable=expandable)
+# Multiple conditions with grouping
+url = "/users?$filter=(age gt 18 and age lt 65) and (contains(name,'John') or contains(email,'john'))"
+
+# Date-based filtering
+url = "/orders?$filter=created_date ge 2023-01-01T00:00:00Z and amount gt 100"
+
+# Relationship filtering
+url = "/users?$filter=orders/any(o: o/amount gt 1000)"
 ```
 
-### Logging
+### Multi-Level Expansion
 
 ```python
-import logging
+# Deep relationship expansion
+url = "/users?$expand=orders($expand=items($select=name,price;$orderby=price desc))"
 
-logger = logging.getLogger(__name__)
-query = PeeweeODataQuery([User], url,  logger=logger)
+# Conditional expansion
+url = "/customers?$expand=orders($filter=status eq 'active';$expand=items)"
 ```
 
-### Custom Field Values
+### Metadata Generation
 
 ```python
-# Create with default and rewrite values
-query.create(
-    data={'name': 'John'},
-    default_field_values={'status': 'active'},
-    rewrite_filed_values={'created_by': current_user.id}
+from peewee_metadata import PeeweeODataMeta
+
+# Generate OData v4 CSDL metadata
+metadata_xml = PeeweeODataMeta.create_multi_model_metadata(
+    model_classes=[User, Order, Product],
+    namespace="MyService",
+    container_name="MyContainer"
 )
 ```
 
-### Complex Filtering Examples
+## ⚙️ Configuration Options
+
+### Constructor Parameters
+
+- **models** - Primary models that can be browsed and modified
+- **expandable** - Models that can only be expanded (read-only)
+- **logger** - Logger instance for operation tracking
+- **etag_callable** - Method to generate ETags for concurrency control
+- **select_always** - Fields always included in queries (e.g., 'id', 'modified_date')
+
+### Runtime Configuration
 
 ```python
-# Multiple conditions with logical operators
-# $filter=(age gt 18 and age lt 65) and contains(name,'John')
-url = "/users?$filter=(age gt 18 and age lt 65) and contains(name,'John')"
-query = PeeweeODataQuery([User], url])
-
-# String operations
-# $filter=startswith(email,'john') or endswith(email,'@company.com')
-url = "/users?$filter=startswith(email,'john') or endswith(email,'@company.com')"
-query = PeeweeODataQuery([User], url)
+query.set_expand_complex(False)  # Disable automatic FK expansion
+query.add_restriction(User, [User.active == True])  # Add model-level filters
 ```
 
-## API Reference
+## 🚨 Current Limitations
 
-### ODataParser
+- **Single Primary Key** - Only supports models with single-column primary keys
+- **Deep Structure Operations** - Complex nested create/update operations not yet supported
+- **Advanced OData Functions** - Some OData v4 functions are not implemented
+- **Performance** - Complex nested expansions may require optimization for large datasets
 
-Parses OData URLs and extracts query parameters.
+## 🤝 Contributing
 
-```python
-parser = ODataParser("http://example.com/users?$filter=age gt 25")
-parser.run()
-# Access parsed components
-print(parser.filter)  # Parsed filter expression
-print(parser.top)     # Top parameter value
-print(parser.skip)    # Skip parameter value
-```
+We welcome contributions! Please ensure:
 
-### PeeweeODataQuery
+1. **Code Quality** - Follow existing patterns and add comprehensive tests
+2. **Documentation** - Update README and inline documentation
+3. **Performance** - Consider performance implications of changes
+4. **Backward Compatibility** - Maintain API compatibility where possible
 
-Main class for executing OData operations on Peewee models.
+## 📄 License
 
-#### Constructor Parameters
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- **models** (Model): Peewee models to browse (can be expandable if have backreferences)
-- **url** (str): OData URL to parse
-- **expandable** (list): List of allowed model classes to expand only
-- **logger** (Logger, optional): Logger for operation tracking
-- **etag_callable** a method of model to dynamically generate etag
-- **select_always** fields to request , even if they are not included in select parameter (e.g id , etag etc)
-#### Methods
+## 📞 Support
 
-- **query(where=[], join=[])**: Execute SELECT query
-- **create(data={}, rewrite_filed_values={}, default_field_values={})**: Create new entity
-- **update(data={}, rewrite_filed_values={}, default_field_values={}, patch=False)**: Update entity
-- **delete()**: Delete entity
-- **peewee_result_to_dict_or_list(query_result,with_odata_id=True,include_etag=False)**: Convert results to dict/list format (idata and etag support)
+- **Issues**: GitHub issue tracker
+- **Email**: lmartynov@tuta.com
+- **Documentation**: See inline code documentation for detailed API reference
 
-## Limitations
+---
 
-- Currently supports single primary key entities only
-- Deep structure creation/updates not yet supported
-- Relationship operations and OData functions partially implemented
-- Complex nested expand operations may have performance implications
-
-## Etags and Odata id tags in result
-
-To correctly include odata id tag in the result list you have to include always id field, and set with_odata_id parameter to 
-True in peewee_result_to_dict_or_list. 
-
-Etags you can generate out of model itself, providing in constructor etag_callable parameter. A good example is generating
-etag from id and last modification time or version. in this case both fields you need to select in the model via select_always
-list. This ensures that fields are always in the select statement, they will be hidden in case select query does not contain 
-them.
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-
-1. Code follows existing patterns and conventions
-2. Add tests for new features
-3. Update documentation for API changes
-4. Handle edge cases and provide appropriate error messages
-
-
-
-## Support
-
-For issues and questions, please use the GitHub issue tracker or contact the maintainers.
-lmartynov@tuta.com
+**Built with ❤️ for the Python community**
