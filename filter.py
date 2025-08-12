@@ -7,14 +7,18 @@ from lark import Lark, Transformer, v_args
 odata_filter_grammar = r"""
     ?start: expr
 
-    ?expr: and_expr
-         | or_expr  
-         | not_expr
-         | atom
 
-    and_expr: atom "and" expr
-    or_expr: atom "or" expr  
-    not_expr: "not" atom
+    ?expr: or_expr
+
+    ?or_expr: and_expr
+            | or_expr "or" and_expr   -> or_expr
+
+    ?and_expr: not_expr
+            | and_expr "and" not_expr -> and_expr
+
+    ?not_expr: "not" atom             -> not_expr
+            | atom
+
 
     ?atom: comparison
          | function_call

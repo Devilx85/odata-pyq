@@ -1,12 +1,13 @@
-
 from enum import Enum
 from functools import reduce
 from operator import and_
 from typing import List, Tuple
 from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
-from peewee import Model,ForeignKeyField,Field
+from peewee import Model,ForeignKeyField,Field,DateField, DateTimeField
 from .odata_parser import ODataParser
 from logging import Logger
+from datetime import datetime
+from dateutil.parser import isoparse
 
 class DataType(Enum):
     """Enumeration representing different types of OData elements in the system.
@@ -487,6 +488,24 @@ class PeeweeODataQuery:
                     return field,model
         return None,None
 
+    def _convert_str_to_dateandtime(self,s:str)-> datetime:
+        """ Converts ODATA datetime str to datetime object
+
+        Args:
+            s    string represenation of ODATA datatime
+
+        """          
+
+        try:
+            # Try ISO parsing (handles datetime and datetimeoffset)
+            dt = isoparse(s)
+            # If time is 00:00:00 and no timezone, treat as date
+            if dt.time() == datetime.min.time() and dt.tzinfo is None:
+                return dt.date()
+            return dt
+        except Exception as e:
+            raise Exception(f"Invalid OData date format: {s}")
+
 
     def _resolve_field(self,data:str):
         """ Resolves field names (eg order/date)
@@ -586,8 +605,9 @@ class PeeweeODataQuery:
             field = self._resolve_field(expression["field"])
             value = self._resolve_value(expression["value"])
             op = expression["op"]     
+            if isinstance(field, DateField) or isinstance(field, DateTimeField):
+                value = self._convert_str_to_dateandtime(value)
 
-            
             if op in operator_map:
                 self.write_log(f"Applying operator: {op}")
                 return operator_map[op](field, value)
