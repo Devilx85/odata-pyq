@@ -119,6 +119,18 @@ class PeeweeODataQuery:
         #model related restrictions
         self.restrictions = {}
 
+        #Function restrictions
+        self.allow_query = True
+        
+        self.allow_query_filter = True
+        self.allow_query_select = True
+        self.allow_query_expand = True
+        self.allow_query_search = True
+
+        self.allow_update = True
+        self.allow_create = True
+        self.allow_delete = True
+
         self.apply_navigation_model()
 
     def set_expand_complex(self,expand:bool):
@@ -209,11 +221,17 @@ class PeeweeODataQuery:
         """      
 
         #Apply implemented query options
-        #   
-        self.apply_filter_model()
-        self.apply_expand_model(starting_class=self.navigated_class)
+        
+        if self.allow_query_filter:
+            self.apply_filter_model()
+        if self.allow_query_expand:
+            self.apply_expand_model(starting_class=self.navigated_class)
+        
         self.apply_sorting_model()
-        self.apply_select_model()
+        
+        if self.allow_query_select:
+         self.apply_select_model()
+        
         select =  [self.navigated_class]
         backrefs =  []
 
@@ -257,7 +275,8 @@ class PeeweeODataQuery:
             query = query.join(*self.joins)
         
         #Add search conditions if exist
-        self._include_search_fieds(self.navigated_class,self.parser.search)
+        if self.allow_query_search:
+            self._include_search_fieds(self.navigated_class,self.parser.search)
 
         if self.where_cond:
             query = query.where(*self.where_cond)
@@ -302,6 +321,10 @@ class PeeweeODataQuery:
             default_field_values      dict of default values
 
         """       
+
+        if not self.allow_create:
+            raise Exception(f"Operation is not supported") 
+        
         #Query params cannot be applied to mutations
         if self.parser.has_parameters():
             raise Exception(f"Mutation does not support query parameters!")
@@ -343,6 +366,10 @@ class PeeweeODataQuery:
             patch                     Patching or full replace?
 
         """        
+
+        if not self.allow_update:
+            raise Exception(f"Operation is not supported") 
+        
         if self.parser.has_parameters():
             raise Exception(f"Mutation does not support query parameters!")
         
@@ -400,7 +427,11 @@ class PeeweeODataQuery:
 
         Args:
             where   "where" restricition conditions for deleteion
-        """         
+        """  
+
+        if not self.allow_delete:
+            raise Exception(f"Operation is not supported") 
+           
         if self.parser.has_parameters():
             raise Exception(f"Mutation does not support query parameters!")
         
@@ -828,7 +859,7 @@ class PeeweeODataQuery:
 
         
 
-    def peewee_result_to_dict_or_list(self, query_result,with_odata_id=True,include_etag=False)-> list | dict:
+    def to_odata_response(self, query_result,with_odata_id=True,include_etag=False)-> list | dict:
         """ Converts query result to a dictionary or list od dicts
 
         Args:
