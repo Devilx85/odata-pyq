@@ -13,9 +13,8 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     # list your production dependencies here
-    "peewee",
-    "urllib",
-    "lark",
+    "pytest-cov",
+    "pytest",
 ]
 
 [project.optional-dependencies]
