@@ -224,7 +224,8 @@ deleted_user = query.delete()
 
 ```python
 # Restrict access to specific models
-expandable = [User, Order]  # models list and only these models can be accessed or viewed. Expandable models cannot be modified and do not include eatags or odata ids
+# Expandable models cannot be modified and do not include eatags or odata ids
+expandable = [User, Order]  
 query = PeeweeODataQuery([User], url, expandable=expandable)
 ```
 
