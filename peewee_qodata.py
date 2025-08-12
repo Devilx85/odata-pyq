@@ -904,6 +904,7 @@ class PeeweeODataQuery:
                 sub_tree.set_hidden_fields(self.hidden)
                 sub_tree.set_search_fields(self.search_fields)
                 sub_tree.set_expand_complex(self.expand_complex)
+                sub_tree.restrictions = self.restrictions
                 filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
                 # Serialize the filtered and expanded result
                 data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
