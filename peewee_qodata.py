@@ -4,7 +4,7 @@ from operator import and_
 from typing import List, Tuple
 from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 from peewee import Model,ForeignKeyField,Field,DateField, DateTimeField
-from .odata_parser import ODataParser
+from .odata_parser import ODataParser,ODataURLParser
 from logging import Logger
 from datetime import datetime
 from dateutil.parser import isoparse
@@ -233,7 +233,7 @@ class PeeweeODataQuery:
         if self.allow_query_select:
          self.apply_select_model()
         
-        select =  [self.navigated_class]
+        select =  []
         backrefs =  []
 
         #Apply select fields if exist
@@ -241,6 +241,8 @@ class PeeweeODataQuery:
             for mod_class,field in self.select_fields:
                 select.append(field)
             self.write_log(f"Selecting fields {self.select}")
+        else:
+            select.append(self.navigated_class)
 
 
         self.write_log(f"Building req ...sel {self.select} join {self.joins} where {self.where_cond} , backrefs {backrefs}")
@@ -738,7 +740,7 @@ class PeeweeODataQuery:
                 if self.path_classes[-1].data_type == DataType.COLLECTION and data_type == DataType.COLLECTION:
                     raise Exception(f"Incorrect path , two collections cannot be realted {self.path_classes[-1].path} and {item['entity']}")
                 
-                self.write_log(f"Checking if class {found_class} is allowed in {self.allowed_objects} ")
+                self.write_log(f"Checking if class {found_class} is allowed ")
 
                 if found_class not in self.models and found_class not in self.expandable:
                     raise Exception(f"Operations is not allowed!")
@@ -896,7 +898,12 @@ class PeeweeODataQuery:
             if self.expand_complex:
                 for field_name, field_object in self.navigated_class._meta.fields.items():
                     if isinstance(field_object, ForeignKeyField):
-                        data[field_name] = getattr(obj,field_name).__data__.copy()
+                            try:
+                                related_obj = getattr(obj, field_name, None)
+                                if related_obj:
+                                    data[field_name] = related_obj.__data__.copy()
+                            except:
+                                pass
 
             if with_odata_id:
                 name = self._extract_before_parenthesis(self.path_classes[0].path)
@@ -908,14 +915,19 @@ class PeeweeODataQuery:
             
             difference = None
 
-
+ 
             if self.parser.select:
-                #Hide fiedls which should be always selected but not in the list, like id    
+                #Hide fiedls which should be always selected but not in the list, like id 
+                
                 difference = [item for item in self.select_always if item not in self.parser.select]
+                self.write_log(f"Hiding fields: {difference}")   
+
                 data = {
-                    k: '' if k in difference else v
+                    k: v
                     for k, v in data.items()
+                    if k not in difference
                 }
+
 
 
             for model,exp,nested in self.expands:
@@ -949,7 +961,10 @@ class PeeweeODataQuery:
 
                 if not nested:
                     nested = ""
-
+                
+                #Convert back internal expand ';' -> '&' for correct parsing 
+                nested = '&'.join(ODataURLParser.smart_split(nested,';'))
+                
                 #build a query object for the recursive backref processing
                 sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
                 sub_tree.set_hidden_fields(self.hidden)
@@ -964,9 +979,11 @@ class PeeweeODataQuery:
 
             # Hide fields:
             data = {
-                k: '' if k in self.hidden else v
+                k: v
                 for k, v in data.items()
+                if k not in self.hidden
             }
+
 
 
             return data

@@ -1,3 +1,4 @@
+import ast
 from lark import Lark, Transformer, v_args
 
 # Class allows to strucutre correctly $filter expression returning back
@@ -42,7 +43,9 @@ odata_filter_grammar = r"""
          | "false"            -> false
          | "null"            -> null
 
-    SINGLE_QUOTED_STRING: /'[^']*'/
+    
+    SINGLE_QUOTED_STRING: /'(?:[^']|'')*'/
+
 
     FUNC_NAME.2: "startswith" | "endswith" | "contains" | "substringof"
                | "length" | "indexof" | "tolower" | "toupper" | "trim"
@@ -85,7 +88,14 @@ class ODataFilterTransformer(Transformer):
         return float(token)
 
     def string(self, token):
-        return str(token)[1:-1]  # remove quotes
+        text = str(token)
+        
+        if text.startswith('"'):
+            return ast.literal_eval(text)  # handles \" correctly
+        elif text.startswith("'"):
+            # Remove outer quotes and replace doubled single quotes with one
+            return text[1:-1].replace("''", "'")
+
 
     def true(self):
         return True
