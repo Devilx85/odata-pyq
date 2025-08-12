@@ -1,6 +1,6 @@
 import pytest
 from lark import Lark
-from .filter import ODataFilterTransformer, ODataFunction, odata_filter_grammar
+from filter import ODataFilterTransformer, ODataFunction, odata_filter_grammar
 
 class TestFilterParsing:
     """Test OData filter parsing functionality in isolation"""
