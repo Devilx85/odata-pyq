@@ -3,9 +3,9 @@ import re
 from typing import Deque, Dict, List, Any, Optional, Union, Callable, Tuple, Set
 from urllib.parse import urlparse, parse_qs,unquote
 from lark import Lark
-from .path import ODataPathTransformer , odata_path_grammar
-from .filter import ODataFilterTransformer , odata_filter_grammar
-from .orderby import ODataOrderByTransformer, odata_orderby_grammar
+from  odata.path import ODataPathTransformer , odata_path_grammar
+from  odata.filter import ODataFilterTransformer , odata_filter_grammar
+from  odata.orderby import ODataOrderByTransformer, odata_orderby_grammar
 
 # These OData parser classes allow to parse correctly OData url + queries, both regex and lark are used to correctly form a strucutre of the request
 
