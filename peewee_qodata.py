@@ -938,7 +938,7 @@ class PeeweeODataQuery:
                 sub_tree.restrictions = self.restrictions
                 filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
                 # Serialize the filtered and expanded result
-                data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
+                data[exp] = sub_tree.to_odata_response(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
 
                 return data
 
