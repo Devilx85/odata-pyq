@@ -8,9 +8,9 @@ from unittest.mock import Mock
 from odata.filter import ODataLogOperator, ODataOperator
 
 # Assuming your package structure - adjust imports as needed
-from odata_parser import ODataParser
-from peewee_qodata import PeeweeODataQuery, DataType
-from peewee_metadata import PeeweeODataMeta
+from odata.odata_parser import ODataParser
+from odata.peewee_qodata import PeeweeODataQuery, DataType
+from odata.peewee_metadata import PeeweeODataMeta
 
 # Test database setup
 test_db = SqliteDatabase(':memory:')
