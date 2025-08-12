@@ -886,6 +886,7 @@ class PeeweeODataQuery:
                 sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
                 sub_tree.set_hidden_fields(self.hidden)
                 sub_tree.set_search_fields(self.search_fields)
+                sub_tree.set_expand_complex(self.expand_complex)
                 filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
                 # Serialize the filtered and expanded result
                 data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
