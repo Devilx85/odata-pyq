@@ -98,6 +98,11 @@ query.set_skiptoken(100) #Max lines in the result
 query.set_hidden_fields(["password_hash"]) 
 ```
 
+to prevent auto expanding of foreignkey fields (complex entity)
+```python
+query.set_expand_complex(False) # id instead of sub-entity
+```
+
 #### Filtering
 ```python
 # GET /users?$filter=age gt 25 and name eq 'John'
