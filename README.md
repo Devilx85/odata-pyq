@@ -37,7 +37,7 @@ PeeweeODataQuery can be used only with single primary key "id", compound keys ar
 - Complex nested URL parsing with parentheses and ampersands
 - Foreign key and backref relationship navigation
 - Circular reference detection and prevention
-- Model access control via allowed objects list
+- Model access control via allowed objects to browse+modify and expand 
 - Comprehensive logging support
 - etag and odata id on-fly inclusion
 
@@ -48,6 +48,12 @@ pip install peewee lark
 ```
 
 ## Quick Start
+
+**IMPORTANT!**
+Model's navigation starts with any provided class in "models" parameter of the constructor. 
+Name of the path should starts with class name in lowercase + "s".
+Exmaple: class User will be searched as "users" in the query path start. 
+ForeignKey fields and backrefs can be navigated if class is listed in models or in expandable parameter.
 
 ### Basic Setup
 
@@ -74,7 +80,7 @@ class Order(Model):
 #### Simple Query
 ```python
 # GET /users?$top=10&$skip=20
-query = PeeweeODataQuery(User, "/users?$top=10&$skip=20", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users?$top=10&$skip=20")
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
 
@@ -82,9 +88,8 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users?$filter=age gt 25 and name eq 'John'
 query = PeeweeODataQuery(
-    User, 
-    "/users?$filter=age gt 25 and name eq 'John'",
-    allowed_objects=[User]
+    [User], 
+    "/users?$filter=age gt 25 and name eq 'John'"
 )
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
@@ -93,9 +98,8 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users?$filter=contains(name,'john')
 query = PeeweeODataQuery(
-    User,
-    "/users?$filter=contains(name,'john')",
-    allowed_objects=[User]
+    [User],
+    "/users?$filter=contains(name,'john')"
 )
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
@@ -104,9 +108,8 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users?$select=name,email
 query = PeeweeODataQuery(
-    User,
-    "/users?$select=name,email",
-    allowed_objects=[User]
+    [User],
+    "/users?$select=name,email"
 )
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
@@ -115,9 +118,8 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users?$orderby=age desc,name asc
 query = PeeweeODataQuery(
-    User,
-    "/users?$orderby=age desc,name asc",
-    allowed_objects=[User]
+    [User],
+    "/users?$orderby=age desc,name asc"
 )
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
@@ -126,9 +128,9 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users?$expand=orders
 query = PeeweeODataQuery(
-    User,
+    [User],
     "/users?$expand=orders",
-    allowed_objects=[User, Order]
+    expandable=[Order]   #Can be expanded but not navigated from root/or modified
 )
 results = query.peewee_result_to_dict_or_list(query.query())
 ```
@@ -137,9 +139,9 @@ results = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users?$expand=orders($filter=amount gt 100;$orderby=created_date desc)
 query = PeeweeODataQuery(
-    User,
+    [User],
     "/users?$expand=orders($filter=amount gt 100;$orderby=created_date desc)",
-    allowed_objects=[User, Order]
+    expandable=[Order]
 )
 results = results = query.peewee_result_to_dict_or_list(query.query())(query.query())
 ```
@@ -149,7 +151,7 @@ results = results = query.peewee_result_to_dict_or_list(query.query())(query.que
 #### Entity by ID
 ```python
 # GET /users(123)
-query = PeeweeODataQuery(User, "/users(123)", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users(123)")
 user = query.peewee_result_to_dict_or_list(query.query())
 ```
 
@@ -157,9 +159,9 @@ user = query.peewee_result_to_dict_or_list(query.query())
 ```python
 # GET /users(123)/orders
 query = PeeweeODataQuery(
-    User, 
+    [User], 
     "/users(123)/orders",
-    allowed_objects=[User, Order]
+    expandable=[ Order]
 )
 orders = query.peewee_result_to_dict_or_list(query.query())
 ```
@@ -169,7 +171,7 @@ orders = query.peewee_result_to_dict_or_list(query.query())
 #### Create Entity
 ```python
 # POST /users
-query = PeeweeODataQuery(User, "/users", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users")
 new_user = query.create({
     'name': 'John Doe',
     'email': 'john@example.com',
@@ -180,7 +182,7 @@ new_user = query.create({
 #### Update Entity (PUT)
 ```python
 # PUT /users(123)
-query = PeeweeODataQuery(User, "/users(123)", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users(123)")
 updated_user = query.update({
     'name': 'John Smith',
     'email': 'johnsmith@example.com',
@@ -191,14 +193,14 @@ updated_user = query.update({
 #### Partial Update (PATCH)
 ```python
 # PATCH /users(123)
-query = PeeweeODataQuery(User, "/users(123)", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users(123)")
 updated_user = query.update({'age': 32}, patch=True)
 ```
 
 #### Delete Entity
 ```python
 # DELETE /users(123)
-query = PeeweeODataQuery(User, "/users(123)", allowed_objects=[User])
+query = PeeweeODataQuery([User], "/users(123)")
 deleted_user = query.delete()
 ```
 
@@ -208,8 +210,8 @@ deleted_user = query.delete()
 
 ```python
 # Restrict access to specific models
-allowed_models = [User, Order]  # Only these models can be accessed
-query = PeeweeODataQuery(User, url, allowed_objects=allowed_models)
+expandable = [User, Order]  # models list and only these models can be accessed or viewed. Expandable models cannot be modified and do not include eatags or odata ids
+query = PeeweeODataQuery([User], url, expandable=expandable)
 ```
 
 ### Logging
@@ -218,7 +220,7 @@ query = PeeweeODataQuery(User, url, allowed_objects=allowed_models)
 import logging
 
 logger = logging.getLogger(__name__)
-query = PeeweeODataQuery(User, url, allowed_objects=[User], logger=logger)
+query = PeeweeODataQuery([User], url,  logger=logger)
 ```
 
 ### Custom Field Values
@@ -238,12 +240,12 @@ query.create(
 # Multiple conditions with logical operators
 # $filter=(age gt 18 and age lt 65) and contains(name,'John')
 url = "/users?$filter=(age gt 18 and age lt 65) and contains(name,'John')"
-query = PeeweeODataQuery(User, url, allowed_objects=[User])
+query = PeeweeODataQuery([User], url])
 
 # String operations
 # $filter=startswith(email,'john') or endswith(email,'@company.com')
 url = "/users?$filter=startswith(email,'john') or endswith(email,'@company.com')"
-query = PeeweeODataQuery(User, url, allowed_objects=[User])
+query = PeeweeODataQuery([User], url)
 ```
 
 ## API Reference
@@ -267,9 +269,9 @@ Main class for executing OData operations on Peewee models.
 
 #### Constructor Parameters
 
-- **initial_class** (Model): Starting Peewee model class
+- **models** (Model): Peewee models to browse (can be expandable if have backreferences)
 - **url** (str): OData URL to parse
-- **allowed_objects** (list): List of allowed model classes
+- **expandable** (list): List of allowed model classes to expand only
 - **logger** (Logger, optional): Logger for operation tracking
 - **etag_callable** a method of model to dynamically generate etag
 - **select_always** fields to request , even if they are not included in select parameter (e.g id , etag etc)
@@ -279,7 +281,7 @@ Main class for executing OData operations on Peewee models.
 - **create(data={}, rewrite_filed_values={}, default_field_values={})**: Create new entity
 - **update(data={}, rewrite_filed_values={}, default_field_values={}, patch=False)**: Update entity
 - **delete()**: Delete entity
-- **peewee_result_to_dict_or_list(query_result)**: Convert results to dict/list format
+- **peewee_result_to_dict_or_list(query_result,with_odata_id=True,include_etag=False)**: Convert results to dict/list format (idata and etag support)
 
 ## Limitations
 
