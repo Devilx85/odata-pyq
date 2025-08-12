@@ -1,6 +1,9 @@
 
 from enum import Enum
+from functools import reduce
+from operator import and_
 from typing import List, Tuple
+from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 from peewee import Model,ForeignKeyField,Field
 from .odata_parser import ODataParser
 from logging import Logger
@@ -81,6 +84,7 @@ class PeeweeODataQuery:
         self.etag_callable = etag_callable
 
         #Parse Parameters
+        self.url = url
         self.parser = ODataParser(url)
         self.parser.run()
 
@@ -96,12 +100,52 @@ class PeeweeODataQuery:
 
         # Add a cache for model relationships
         self._model_rel_cache = {}
-
         self.expandable = expandable
 
+        #Forced pagination
+        self.skiptoken_size = 0
+        self.skiptoken_page = 0
+        self.next_page = 0
+
+        #Hidden fields
+        self.hidden = []
+
+        #Expand complex
+        self.expand_complex = True
+
+        #Search fiedls
+        self.search_fields = []
 
         self.apply_navigation_model()
-    
+
+    def set_expand_complex(self,expand:bool):
+        """Method to determine if to expand complex (foregin keys) fields by default (not backrefs!)
+
+        Args:
+            size            number of records to produce
+        """        
+        self.expand_complex = expand
+    def set_skiptoken(self,size:int):
+        """Method to set forced pagination size
+
+        Args:
+            size            number of records to produce
+        """        
+        self.skiptoken_size = size
+    def set_hidden_fields(self,fields=List[str]):
+        """Method to set fileds to be hidden in results (without output too consumer)
+
+        Args:
+            fields        list of fields
+        """
+        self.hidden  = fields
+    def set_search_fields(self,model_fields=List[str]):
+        """Method to set model fileds' names to search a string in with $search parameter
+
+        Args:
+            fields        list of field names
+        """
+        self.search_fields  = model_fields
     def write_log(self,message:str):
         """Method to write logs if logger is provided
 
@@ -110,6 +154,39 @@ class PeeweeODataQuery:
         """
         if self.logger:
             self.logger.info(message)
+    
+    def _include_search_fieds(self,model,search:str):
+        """To be run right before request to add search  fields with AND operator
+        ([collected where conditions]) AND ([search fields contain $search])
+
+        Args:
+            model       Peewee model
+            search      search string
+        """  
+        if not self.search_fields or search == None or search == "":
+            self.write_log(f"No fields to search, skipping")
+            return
+            
+        search_conds = []
+        for field in self.search_fields:
+            if field in model._meta.fields:
+                search_conds.append(getattr(model,field).contains(search))
+                self.write_log(f"Adding search in {model} {field} with {search}")
+
+        if search_conds:
+            base_cond = reduce(and_, self.where_cond) if self.where_cond else None
+            # Combine search conditions
+            search_cond = reduce(and_, search_conds)
+
+            # Merge both with AND
+            if base_cond:
+                final_cond = base_cond & search_cond
+            else:
+                final_cond = search_cond
+
+            self.where_cond = [final_cond]
+
+
     def query(self,where=[],join=[]):
         """ Execute Query (GET)
 
@@ -126,7 +203,7 @@ class PeeweeODataQuery:
         self.apply_expand_model(starting_class=self.navigated_class)
         self.apply_sorting_model()
         self.apply_select_model()
-        select =  []
+        select =  [self.navigated_class]
         backrefs =  []
 
         #Apply select fields if exist
@@ -151,20 +228,55 @@ class PeeweeODataQuery:
         
         self.write_log(f"Query : sel {self.navigated_class} {select} join {self.joins} where {self.where_cond} with fetch {backrefs}")
         
+        #Support for auto expanding FK definitions in the model
+        if self.expand_complex:
+            for field_name, field_object in self.navigated_class._meta.fields.items():
+                if isinstance(field_object, ForeignKeyField) and hasattr(field_object,'rel_model'):
+                    if field_object.rel_model not in select:
+                        select.append(field_object.rel_model)
+                    if field_object.rel_model not in self.joins:
+                        self.joins.append(field_object.rel_model)
 
         query = self.navigated_class.select(*select)
 
         if self.joins:
             query = query.join(*self.joins)
+        
+        #Add search conditions if exist
+        self._include_search_fieds(self.navigated_class,self.parser.search)
+
         if self.where_cond:
             query = query.where(*self.where_cond)
         if self.sorts:    
             query = query.order_by(*self.sorts)
         
+        if self.skiptoken_size != 0:
+            cnt_query = query
+            total = cnt_query.count()
+            if total > self.skiptoken_size:
+                if self.parser.skip_token == None:
+                    self.parser.skip_token = 0
+                self.parser.skip = self.parser.skip_token * self.skiptoken_size
+                
+                if self.parser.skip > total or ( self.parser.skip  + self.skiptoken_size) >= total:
+                    self.next_page = -1 
+                else:
+                    self.next_page = self.parser.skip_token + 1
+
+                self.parser.top  =  self.skiptoken_size
+                
+                self.write_log(f"Skipping {self.parser.skip} records and limit to {self.parser.top} with skiptoken = {self.parser.skip_token}")
+                
         if self.parser.skip is not None:
             query = query.offset(self.parser.skip)
         if self.parser.top is not None:
             query = query.limit(self.parser.top)
+
+        if self.parser.count == True:
+            query = query.count()
+
+
+
 
         return query
     def create(self,data={},rewrite_filed_values={},default_field_values={}):  
@@ -559,6 +671,7 @@ class PeeweeODataQuery:
                     raise Exception(f"Incorrect path , two collections cannot be realted {self.path_classes[-1].path} and {item['entity']}")
                 
                 self.write_log(f"Checking if class {found_class} is allowed in {self.allowed_objects} ")
+
                 if found_class not in self.models and found_class not in self.expandable:
                     raise Exception(f"Operations is not allowed!")
                 
@@ -663,6 +776,41 @@ class PeeweeODataQuery:
         """ 
         return text.split('(')[0].strip()
 
+    def _replace_skiptoken(self,new_token: str) -> str:
+        """ Replaces skiptoken in url
+
+        Args:
+            new_token    new pagination token
+
+        """ 
+        # Parse the URL into components
+        parsed_url = urlparse(self.url)
+        
+        # Parse the query string into a dictionary
+        query_params = parse_qs(parsed_url.query, keep_blank_values=True)
+        
+        # Replace or add the $skiptoken parameter
+        query_params['$skiptoken'] = [new_token]
+        
+        # Reconstruct the query string
+        new_query = urlencode(query_params, doseq=True, quote_via=quote)
+
+
+
+        # Rebuild the full URL
+        updated_url = urlunparse((
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            parsed_url.params,
+            new_query,
+            parsed_url.fragment
+        ))
+        
+        return updated_url
+
+        
+
     def peewee_result_to_dict_or_list(self, query_result,with_odata_id=True,include_etag=False)-> list | dict:
         """ Converts query result to a dictionary or list od dicts
 
@@ -673,24 +821,29 @@ class PeeweeODataQuery:
 
         """ 
         def serialize(obj):
-            #Internal function for recursive processing
+            #Internal function for recursive processing            
             data = obj.__data__.copy()
+
+            #Support for auto expanding FK definitions in the model
+            if self.expand_complex:
+                for field_name, field_object in self.navigated_class._meta.fields.items():
+                    if isinstance(field_object, ForeignKeyField):
+                        data[field_name] = getattr(obj,field_name).__data__.copy()
+
             if with_odata_id:
                 name = self._extract_before_parenthesis(self.path_classes[0].path)
                 data["@odata.id"] = f"{name}({data['id']})"
             if include_etag:
-                print(obj)
                 f = getattr(obj,self.etag_callable)
                 data["@odata.etag"] = f()
-            # Include related models
+
             
             difference = None
+
 
             if self.parser.select:
                 #Hide fiedls which should be always selected but not in the list, like id    
                 difference = [item for item in self.select_always if item not in self.parser.select]
-
-
                 data = {
                     k: '' if k in difference else v
                     for k, v in data.items()
@@ -717,38 +870,33 @@ class PeeweeODataQuery:
                     child_models = self.models
                     child_expandabel = self.expandable
 
-                if nested:
-
-                    # Build a filtered query for the related model
-                    fk_field, fk_model = self.get_field_name_from_backref(model, exp)
 
 
-                    if not fk_field:
-                        raise Exception(f"Cannot resolve backref field for {exp}")
+                # Build a filtered query for the related model
+                fk_field, fk_model = self.get_field_name_from_backref(model, exp)
 
-                    #build a query object for the recursive backref processing
-                    sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
-                    filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
-                    # Serialize the filtered and expanded result
-                    data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
 
-                    return data
-                else:
-                    
-                    query = model.select().where(
-                        getattr(model, obj.__class__.__name__.lower()) == obj.id
-                    )
+                if not fk_field:
+                    raise Exception(f"Cannot resolve backref field for {exp}")
 
-                if include_etag:
-                    data[exp] = [{**item.__data__, "new_key": getattr(item,self.etag_callable)()} for item in query]
-                else:
-                    data[exp] = [item.__data__ for item in query]
+                if not nested:
+                    nested = ""
 
-                #Hide fiedls which should be always selected but not in the list, like id       
-                if difference:
-                    data[exp] = [
-                    {**item, **{key: '' for key in difference}} for item in data[exp]
-                    ]    
+                #build a query object for the recursive backref processing
+                sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
+                sub_tree.set_hidden_fields(self.hidden)
+                sub_tree.set_search_fields(self.search_fields)
+                filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
+                # Serialize the filtered and expanded result
+                data[exp] = sub_tree.peewee_result_to_dict_or_list(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
+
+                return data
+
+            # Hide fields:
+            data = {
+                k: '' if k in self.hidden else v
+                for k, v in data.items()
+            }
 
 
             return data
@@ -758,12 +906,21 @@ class PeeweeODataQuery:
         if isinstance(query_result, Model):
             result_list = [serialize(query_result)]
         else:
+            if self.parser.count == True:
+                return str(query_result)
+            
             result_list = [serialize(obj) for obj in query_result]
 
 
         if len(result_list) == 1:
             return result_list[0]
-        return result_list
+        
+        if type(result_list) == list:
+            final_res = { "value" : result_list}
+            if self.skiptoken_size != 0 and self.next_page != -1:
+                final_res["@odata.nextLink"] = self._replace_skiptoken(str(self.next_page))
+
+        return final_res
 
 
 

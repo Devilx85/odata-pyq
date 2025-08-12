@@ -222,6 +222,7 @@ class ODataParser:
         self.count = None
         self.search = None
         self.format = None
+        self.skip_token = None
         #self.compute = None
         #self.apply = None
         self.parsed_path = None
@@ -232,12 +233,13 @@ class ODataParser:
             return True
         return False
     def run(self):
-        print(self.path , self.params)
-
-        if self.path.endswith("$count"):
-            self.count = True
 
 
+        if "$count" in self.params:
+            if self.params["$count"][0] == "true":
+                self.count = True
+            else:
+                self.count = False
         if "$top" in self.params:
             try:
                 self.top = int(self.params["$top"][0])
@@ -246,6 +248,11 @@ class ODataParser:
         if "$skip" in self.params:
             try:
                 self.skip = int(self.params["$skip"][0])
+            except:
+                pass
+        if "$skiptoken" in self.params:
+            try:
+                self.skip_token = int(self.params["$skiptoken"][0])
             except:
                 pass
         if "$expand" in self.params:
