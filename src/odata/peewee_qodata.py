@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, quote, urlencode, urlparse, urlunparse
 from peewee import Model,ForeignKeyField,Field,DateField, DateTimeField
 
 from odata.filter import ODataField, ODataFunction, ODataLogOperator, ODataOperator, ODataPrimitve
-from .odata_parser import ODataParser,ODataURLParser
+from odata_parser import ODataParser,ODataURLParser
 from logging import Logger
 from datetime import datetime
 from dateutil.parser import isoparse
