@@ -19,5 +19,6 @@ dependencies = [
 test = [
   "pytest",
   "pytest-cov",
-  "lark",  # <-- Add your specific testing dependency here
+  "lark",
+  "peewee",
 ]
