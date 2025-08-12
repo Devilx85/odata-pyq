@@ -497,8 +497,8 @@ class PeeweeODataQuery:
                 cur_class = rel_class
 
                 #add class to the collection
-                if rel_class not in self.select:
-                    self.select.append(rel_class)
+                #if rel_class not in self.select:
+                #    self.select.append(rel_class)
 
                 if rel_class not in self.joins:
                     self.joins.append(rel_class)
