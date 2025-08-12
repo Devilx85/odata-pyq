@@ -1,5 +1,4 @@
-Here is a description of the filter structure based on the provided Python classes, which I will now integrate into the previously generated README file.
-
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO_NAME/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO_NAME)
 -----
 
 # OData Parser + Peewee Integration
