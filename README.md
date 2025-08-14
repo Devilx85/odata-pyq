@@ -27,7 +27,7 @@ A comprehensive Python library that provides OData v4 query parsing and seamless
   - **Arithmetic operators**: `add`, `sub`, `mul`, `div`
   - **String functions**: `contains()`, `startswith()`, `endswith()`.
   - **Logical operators**: `and`, `or`, `not`.
-  - **Date operators**: now()
+  - **Date operators**: `now()`
   - **Complex nested expressions** with parentheses.
   - **Field navigation** through relationships (e.g., `order/customer/name`).
 
