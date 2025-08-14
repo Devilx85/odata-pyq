@@ -33,7 +33,7 @@ odata_filter_grammar = r"""
     field: path
     path: NAME ("/" NAME)*
 
-    OPERATOR: "eq" | "ne" | "gt" | "lt" | "ge" | "le"
+    OPERATOR: "eq" | "ne" | "gt" | "lt" | "ge" | "le" | "add" | "sub" | "mul" | "div" | "mod" 
     operator: OPERATOR
 
     value: SIGNED_NUMBER      -> number
@@ -47,7 +47,7 @@ odata_filter_grammar = r"""
     SINGLE_QUOTED_STRING: /'(?:[^']|'')*'/
 
 
-    FUNC_NAME.2: "startswith" | "endswith" | "contains" | "substringof"
+    FUNC_NAME.2: "startswith" | "endswith" | "contains" | "substringof" | "now"
                | "length" | "indexof" | "tolower" | "toupper" | "trim"
                | "concat" | "year" | "month" | "day" | "hour" | "minute" | "second"
                    

@@ -136,14 +136,14 @@ class TestODataURLParser:
     
     def test_filter_parsing(self):
         """Test $filter parameter parsing"""
-        parser = ODataParser("http://localhost/api/users?$filter=age gt 25")
+        parser = ODataParser("http://localhost/api/users?$filter=order_date ge now()")
         parser.run()
         
         assert parser.filter is not None
         assert type(parser.filter) == ODataOperator
-        assert parser.filter.a.name == "age"
-        assert parser.filter.name == "gt"
-        assert parser.filter.b.value == 25
+        assert parser.filter.a.name == "order_date"
+        assert parser.filter.name == "ge"
+        assert parser.filter.b.name == "now"
     
     def test_complex_filter_parsing(self):
         """Test complex $filter with AND/OR"""

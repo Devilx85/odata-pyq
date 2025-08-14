@@ -608,12 +608,20 @@ class PeeweeODataQuery:
             "lt": lambda f, v: f < v,
             "ge": lambda f, v: f >= v,
             "le": lambda f, v: f <= v,
+
+
+            "add": lambda a, b: a + b,
+            "sub": lambda a, b: a - b,
+            "mul": lambda a, b: a * a,
+            "div": lambda a, b: a / b,
+
         }
 
         function_map = {
             "contains": lambda a1, a2: a1.contains(a2),
             "startswith": lambda a1, a2: a1.startswith(a2),
             "endswith": lambda a1, a2: a1.endswith(a2),
+            "now" : lambda : datetime.now()
         }
         
         #function or comparison?
@@ -622,13 +630,17 @@ class PeeweeODataQuery:
 
             if type(expression.a) == ODataPrimitve:
                 a =  self._resolve_value(expression.a)
-            else:
+            elif type(expression.a) == ODataField:
                 a =self._resolve_field(expression.a)
+            else:
+                a =self._filter_run_expression(expression.a)
 
             if type(expression.b) == ODataPrimitve:
                 b =  self._resolve_value(expression.b)
-            else:
+            elif type(expression.b) == ODataField:
                 b =self._resolve_field(expression.b)
+            else:
+                b =self._filter_run_expression(expression.b)
 
             op = expression.name    
             
@@ -648,6 +660,11 @@ class PeeweeODataQuery:
             func = expression.name
             args = expression.args
             self.write_log(f"Applying function: { func }")
+            
+            if len(args) == 0:
+                if func in function_map: 
+                    return function_map[func]()
+                
             if len(args) != 2:
                 raise Exception(f"Function param error {func}") 
             arg1 = self._resolve_field(args[0]) 

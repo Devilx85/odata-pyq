@@ -62,13 +62,13 @@ class TestFilterParsing:
     
     def test_and_expression(self, parser):
         """Test AND logical expression"""
-        result = parser.parse("18 gt age and is_active eq true")
+        result = parser.parse("(9 add 9) gt age and is_active eq true")
         
         assert result.name == "and"
 
         first = result.left
         # First condition
-        assert first.a.value == 18.0 
+        assert first.a.a.value == 9 
         assert first.name == "gt"
         assert first.b.name == "age"
         
