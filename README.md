@@ -27,7 +27,7 @@ A comprehensive Python library that provides OData v4 query parsing and seamless
   - **Arithmetic operators**: `add`, `sub`, `mul`, `div`
   - **String functions**: `contains()`, `startswith()`, `endswith()`.
   - **Logical operators**: `and`, `or`, `not`.
-  - **Date operators**: now()
+  - **Date operators**: `now()`
   - **Complex nested expressions** with parentheses.
   - **Field navigation** through relationships (e.g., `order/customer/name`).
 
@@ -243,8 +243,8 @@ After parsing, the `ODataParser` populates its internal attributes with the stru
 The `ODataParser` and its `ODataFilterTransformer` convert a `$filter` string into a structured object that represents the logical tree of the expression. The structure is composed of several custom classes:
 
   - **`ODataLogOperator`**: Represents a logical operation (`and`, `or`, `not`). It has `left` and `right` attributes that hold other expressions, allowing for nested logic. For a `not` operator, only the `right` attribute is used.
-  - **`ODataOperator`**: Represents a comparison operation (`eq`, `ne`, `gt`, `lt`, `ge`, `le`). It has attributes `a` and `b` for the two sides of the comparison, which can be fields, values, or other expressions.
-  - **`ODataFunction`**: Represents a function call, such as `contains`, `startswith`, or `endswith`. It stores the function `name` and a list of `args`.
+  - **`ODataOperator`**: Represents a comparison operation (`eq`, `ne`, `gt`, `lt`, `ge`, `le`) + arithmetic operators (`add`, `sub`, `mul`, `div`). It has attributes `a` and `b` for the two sides of the comparison, which can be fields, values, or other expressions.
+  - **`ODataFunction`**: Represents a function call, such as `contains`, `startswith`,  `endswith` or `now`. It stores the function `name` and a list of `args`.
   - **`ODataField`**: Represents a field or property name within the filter expression.
   - **`ODataPrimitve`**: Represents a literal value like a string, number, boolean, or `null`.
 
