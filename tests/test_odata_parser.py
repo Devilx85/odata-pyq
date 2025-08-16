@@ -9,7 +9,7 @@ from odata.filter import ODataLogOperator, ODataOperator
 
 # Assuming your package structure - adjust imports as needed
 from odata.odata_parser import ODataParser
-from odata.peewee_qodata import PeeweeODataQuery, DataType
+from odata.peewee_qodata import PeeweeODataQuery, ODataQueryException
 from odata.peewee_metadata import PeeweeODataMeta
 
 # Test database setup
@@ -212,6 +212,7 @@ class TestPeeweeODataQuery:
         """Test basic entity collection query"""
         models = [User, Order, Product, OrderItem]
         query_obj = PeeweeODataQuery(models, "/users")
+
         result = query_obj.query()
         
         assert query_obj.navigated_class == User
@@ -489,8 +490,8 @@ class TestErrorHandling:
         """Test error when requesting non-existent entity collection"""
         models = [User]
         
-        with pytest.raises(Exception) as exc_info:
-            query_obj = PeeweeODataQuery(models, "/nonexistent")
+        with pytest.raises(ODataQueryException) as exc_info:
+            query_obj = PeeweeODataQuery(models, "/nonexistent").query()
         
         assert "does not exist" in str(exc_info.value)
     
@@ -508,8 +509,8 @@ class TestErrorHandling:
         """Test error when accessing unauthorized model"""
         models = [User]  # Only User is allowed
         
-        with pytest.raises(Exception) as exc_info:
-            query_obj = PeeweeODataQuery(models, "/orders")
+        with pytest.raises(ODataQueryException) as exc_info:
+            query_obj = PeeweeODataQuery(models, "/orders").query()
         
         assert "does not exist" in str(exc_info.value)
     

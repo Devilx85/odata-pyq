@@ -35,20 +35,49 @@ class NavigationPath:
         self.full_path = path
         self.via_backref = False
         self.backref_field = None
-        self.id = None
+        self.ids = []
         
 
-    def add_id_cond(self,keys:List[str]):
+    def add_id_cond(self,keys:List[str],model_keys=[]):
         """Function adds id = key where condition for peewee instance 
 
         Args:
             keys (int): ID keys (currently class supports only a single key -> keys[0])
         """
-        #Curreently supporting only 1 ID key
+        #Chek key
+
+
         if keys:
-            self.where.append( self.cl_model.id == keys[0] )
+            if len(model_keys) != len(keys):
+                raise ODataQueryException("Number of keys provided for the entity does not match with actual")
+
+            keys_processed = []
+            #self.ids = keys
             self.data_type = DataType.ENTITY
-            self.id = keys[0]
+            if type(keys) != list:
+                keys = [keys]
+            
+            for key in keys:
+                if type(key) != dict:    
+                    cond = ( model_keys[0] == key )
+                    if model_keys[0] in keys_processed:
+                        raise ODataQueryException(f"Key { model_keys[0].name } already was provided!")
+                    keys_processed.append(model_keys[0])
+                    self.ids.append({ "key": model_keys[0] , "value": key })
+                else:
+                    first_key_provided = next(iter(key))
+                    found_key = next((key for key in model_keys if key.name == first_key_provided),None)
+                    if not found_key:
+                        raise ODataQueryException(f"Key { first_key_provided } not found !")
+                    if found_key in keys_processed:
+                        raise ODataQueryException(f"Key { found_key.name } already was provided!")         
+                    cond = ( found_key == key[first_key_provided] )
+                    
+                    keys_processed.append(found_key)
+                    self.ids.append({ "key": found_key, "value": key[first_key_provided] })
+            
+                self.where.append( cond )
+
     def join_backref(self,field1,field2):
         """Function adds field = key where condition for peewee instance, for the backrefs 
 
@@ -140,7 +169,57 @@ class PeeweeODataQuery:
         #Max expand levels
         self.max_expand = 3
 
-        self.apply_navigation_model()
+        #Model Keys
+        
+        self.model_keys = self._get_model_key_fields(models)
+
+        #Save unique and key fields
+        self.model_ukeys = self._get_model_unique_fields(models)
+        self.model_fkeys = self._get_model_key_fields(models)
+
+        
+
+    def set_model_ufield_as_key(self,model,key:str):
+        """Method to set primary query field(s), allows to use unique field as keys
+
+        Args:
+            model            peewee class names
+            field            array of field names
+        """  
+
+        ukey = next((field for field in self.model_ukeys[model.__name__] if field.name == key),None) 
+
+        if not ukey:
+            raise Exception(f"Cannot find unique key {key} in  model { model }")
+  
+        self.model_keys[model.__name__] = [ukey]
+
+        
+
+    
+    def _get_model_unique_fields(self,models):
+        """Method to collect key fields per model
+
+        Args:
+            models            array of peewee class names
+        """  
+        result = {}
+        for model in models:
+            unique_fields = [field for field in model._meta.fields.values() if field.unique]
+            result[model.__name__] = unique_fields
+        return result
+    
+    def _get_model_key_fields(self,models):
+        """Method to collect key fields per model
+
+        Args:
+            models            array of peewee class names
+        """        
+        result = {}
+        for model in models:
+            key_fields = [field for field in model._meta.fields.values() if field.primary_key]
+            result[model.__name__] = key_fields
+        return result
 
     def set_expand_complex(self,expand:bool):
         """Method to determine if to expand complex (foregin keys) fields by default (not backrefs!)
@@ -238,6 +317,8 @@ class PeeweeODataQuery:
             these are used for expand recusrive function processing
         """      
 
+        self.apply_navigation_model()
+        
         #Apply implemented query options
         
         if self.allow_query_filter:
@@ -342,6 +423,8 @@ class PeeweeODataQuery:
 
         """       
 
+        self.apply_navigation_model()
+
         if not self.allow_create:
             raise ODataQueryException(f"Operation is not supported") 
         
@@ -360,8 +443,8 @@ class PeeweeODataQuery:
         #Checking backref
         if len(self.path_classes)>1 and self.path_classes[-2].data_type == DataType.ENTITY:
             prev_navig = self.path_classes[-2]
-            self.write_log(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.id} ")
-            data[cur_navig.backref_field.name] = prev_navig.id
+            self.write_log(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.ids} ")
+            data[cur_navig.backref_field.name] = prev_navig.ids[0]["value"]
 
 
         #update data to rewrite fields
@@ -386,6 +469,7 @@ class PeeweeODataQuery:
             patch                     Patching or full replace?
 
         """        
+        self.apply_navigation_model()
 
         if not self.allow_update:
             raise ODataQueryException(f"Operation is not supported") 
@@ -413,8 +497,8 @@ class PeeweeODataQuery:
         
         if len(self.path_classes)>1 and self.path_classes[-2].data_type == DataType.ENTITY:
             prev_navig = self.path_classes[-2]
-            self.write_log(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.id} ")
-            data[cur_navig.backref_field.name] = prev_navig.id
+            self.write_log(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.ids} ")
+            data[cur_navig.backref_field.name] = prev_navig.ids[0]["value"]
         
 
 
@@ -448,6 +532,7 @@ class PeeweeODataQuery:
         Args:
             where   "where" restricition conditions for deleteion
         """  
+        self.apply_navigation_model()
 
         if not self.allow_delete:
             raise ODataQueryException(f"Operation is not supported") 
@@ -792,8 +877,9 @@ class PeeweeODataQuery:
         self.navigated_class = ini_class
         ini_path = NavigationPath(ini_class,path=start_seg)
     
-        if self.parser.parsed_path[0]["keys"]:
-            ini_path.add_id_cond(self.parser.parsed_path[0]["keys"])
+        if "keys" in self.parser.parsed_path[0]:
+            self.write_log(f"Applying keys path: { self.parser.parsed_path[0]['keys'] }")
+            ini_path.add_id_cond(self.parser.parsed_path[0]["keys"],self.model_keys[ini_class.__name__])
 
         self.path_classes.append(ini_path)
 
@@ -835,7 +921,7 @@ class PeeweeODataQuery:
                 # if key provided in the Odata path apply it
                 if "keys" in item and item["keys"]:
                     self.write_log(f"Adding keys: { item['keys'] }")
-                    ref_class.add_id_cond(item["keys"])
+                    ref_class.add_id_cond(item["keys"],self.model_keys[found_class.__name__])
                     data_type = DataType.ENTITY
 
             else:
