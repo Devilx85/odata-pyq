@@ -11,6 +11,9 @@ from logging import Logger
 from datetime import datetime
 from dateutil.parser import isoparse
 
+class ODataQueryException(Exception):
+    pass
+
 class DataType(Enum):
     """Enumeration representing different types of OData elements in the system.
 
@@ -134,6 +137,9 @@ class PeeweeODataQuery:
         self.allow_create = True
         self.allow_delete = True
 
+        #Max expand levels
+        self.max_expand = 3
+
         self.apply_navigation_model()
 
     def set_expand_complex(self,expand:bool):
@@ -150,6 +156,15 @@ class PeeweeODataQuery:
             size            number of records to produce
         """        
         self.skiptoken_size = size
+    
+    def set_max_expand(self,levels:int):
+        """Method to set meximum expand levels
+
+        Args:
+            levels            number of levels to expand allowed
+        """        
+        self.max_expand = levels
+
     def set_hidden_fields(self,fields=List[str]):
         """Method to set fileds to be hidden in results (without output too consumer)
 
@@ -328,19 +343,19 @@ class PeeweeODataQuery:
         """       
 
         if not self.allow_create:
-            raise Exception(f"Operation is not supported") 
+            raise ODataQueryException(f"Operation is not supported") 
         
         #Query params cannot be applied to mutations
         if self.parser.has_parameters():
-            raise Exception(f"Mutation does not support query parameters!")
+            raise ODataQueryException(f"Mutation does not support query parameters!")
         
         cur_navig = self.path_classes[-1]
 
         if cur_navig.cl_model not in self.models:
-            raise Exception(f"Data collection is not supported") 
+            raise ODataQueryException(f"Data collection is not supported") 
         
         if cur_navig.data_type != DataType.COLLECTION:
-            raise Exception(f"Can only create entities for collections!")
+            raise ODataQueryException(f"Can only create entities for collections!")
 
         #Checking backref
         if len(self.path_classes)>1 and self.path_classes[-2].data_type == DataType.ENTITY:
@@ -373,26 +388,26 @@ class PeeweeODataQuery:
         """        
 
         if not self.allow_update:
-            raise Exception(f"Operation is not supported") 
+            raise ODataQueryException(f"Operation is not supported") 
         
         if self.parser.has_parameters():
-            raise Exception(f"Mutation does not support query parameters!")
+            raise ODataQueryException(f"Mutation does not support query parameters!")
         
         cur_navig = self.path_classes[-1]
         
         if cur_navig.cl_model not in self.models:
-            raise Exception(f"Data collection is not supported") 
+            raise ODataQueryException(f"Data collection is not supported") 
     
         if cur_navig.data_type != DataType.ENTITY:
-            raise Exception(f"Can only update entities ,not collections!")
+            raise ODataQueryException(f"Can only update entities ,not collections!")
         
         #First execute a query to get udpated record
         res_data = list(self.query(where=where))
 
         if not res_data:
-            raise Exception(f"Entiity does not exist")
+            raise ODataQueryException(f"Entiity does not exist")
         if len(res_data) != 1:
-            raise Exception(f"Selection returned back more than one entity!")    
+            raise ODataQueryException(f"Selection returned back more than one entity!")    
         
         entity = res_data[0]
         
@@ -417,7 +432,7 @@ class PeeweeODataQuery:
                     continue
                 if field_name not in data:
                     if patch == False:
-                        raise Exception("Field {field_name} was not provided, use patch to modify specific fields!")
+                        raise ODataQueryException("Field {field_name} was not provided, use patch to modify specific fields!")
                     else:
                         continue 
                 setattr(entity, field_name,data[field_name])
@@ -435,25 +450,25 @@ class PeeweeODataQuery:
         """  
 
         if not self.allow_delete:
-            raise Exception(f"Operation is not supported") 
+            raise ODataQueryException(f"Operation is not supported") 
            
         if self.parser.has_parameters():
-            raise Exception(f"Mutation does not support query parameters!")
+            raise ODataQueryException(f"Mutation does not support query parameters!")
         
         cur_navig = self.path_classes[-1]
         
         if cur_navig.cl_model not in self.models:
-            raise Exception(f"Data collection is not supported") 
+            raise ODataQueryException(f"Data collection is not supported") 
     
         if cur_navig.data_type != DataType.ENTITY:
-            raise Exception(f"Can only update entities ,not collections!")
+            raise ODataQueryException(f"Can only update entities ,not collections!")
         
         res_data = list(self.query(where=where))
 
         if not res_data:
-            raise Exception(f"Entiity does not exist")
+            raise ODataQueryException(f"Entiity does not exist")
         if len(res_data) != 1:
-            raise Exception(f"Selection returned back more than one entity!")    
+            raise ODataQueryException(f"Selection returned back more than one entity!")    
         
         entity = res_data[0]
 
@@ -473,7 +488,7 @@ class PeeweeODataQuery:
             op = expr.op.name if hasattr(expr.op, 'name') else str(expr.op)
             rhs = repr(expr.rhs)
             return f"{lhs} {op} {rhs}"
-        except Exception as e:
+        except ODataQueryException as e:
             return f"<Error parsing expression: {e}>"
            
 
@@ -507,8 +522,8 @@ class PeeweeODataQuery:
             if dt.time() == datetime.min.time() and dt.tzinfo is None:
                 return dt.date()
             return dt
-        except Exception as e:
-            raise Exception(f"Invalid OData date format: {s}")
+        except ODataQueryException as e:
+            raise ODataQueryException(f"Invalid OData date format: {s}")
 
 
     def _resolve_field(self,field:ODataField):
@@ -536,7 +551,7 @@ class PeeweeODataQuery:
         if data in self._model_rel_cache:
             res_cl,res_dt,_ = self._model_rel_cache[cache_key]
             if res_dt != DataType.FIELD:
-                raise Exception(f"Referenced fieled is Entity or collection, not a field {data}")
+                raise ODataQueryException(f"Referenced fieled is Entity or collection, not a field {data}")
             return res_cl
         
         fld = data
@@ -551,11 +566,11 @@ class PeeweeODataQuery:
                 rel_class , data_type , backref= self.find_model_rel(cur_class,seg)
                 if not rel_class:
                     self.write_log(f"No name {seg}")
-                    raise Exception(f"Unknown field {seg}") 
+                    raise ODataQueryException(f"Unknown field {seg}") 
                 
                 #allow only defined models
                 if rel_class not in self.models and rel_class not in self.expandable:
-                    raise Exception("Path or attribute does not exist")
+                    raise ODataQueryException("Path or attribute does not exist")
                 
                 self.write_log(f"Resolved class for the field ref {rel_class}")
                 cur_class = rel_class
@@ -569,10 +584,10 @@ class PeeweeODataQuery:
                 
 
         if data_type == DataType.COLLECTION and backref==False:
-            raise Exception(f"Relation was resolved instead of entity for field {seg}") 
+            raise ODataQueryException(f"Relation was resolved instead of entity for field {seg}") 
         
         if fld not in cur_class._meta.fields:
-           raise Exception(f"Cannot find field {fld} in object {cur_class}") 
+           raise ODataQueryException(f"Cannot find field {fld} in object {cur_class}") 
 
         field = getattr(cur_class,fld)
         
@@ -585,7 +600,7 @@ class PeeweeODataQuery:
     def _resolve_value(self,data):
         if type(data) == ODataPrimitve:
             return data.value
-        raise Exception("Cannot detect type of {data}")
+        raise ODataQueryException("Cannot detect type of {data}")
     
     def _filter_run_expression(self,expression):
         """ Resolves OData expression recieved from parser (see Odata parser)
@@ -666,14 +681,14 @@ class PeeweeODataQuery:
                     return function_map[func]()
                 
             if len(args) != 2:
-                raise Exception(f"Function param error {func}") 
+                raise ODataQueryException(f"Function param error {func}") 
             arg1 = self._resolve_field(args[0]) 
             arg2 = self._resolve_value(args[1])   
 
             if func in function_map:
                 return function_map[func](arg1, arg2)      
                
-        raise Exception(f"Unknown expression {expression} ")   
+        raise ODataQueryException(f"Unknown expression {expression} ")   
     
     def _filter_apply_log_expressions(self,logoperator):
         """ Applies expresions for the logical operators AND and OR
@@ -699,7 +714,7 @@ class PeeweeODataQuery:
             return (left_expr_res | right_expr_res)
         elif logoperator.name == "not":
             return ~(right_expr_res)
-        raise Exception(f"Unknown logical operator {logoperator.name}")
+        raise ODataQueryException(f"Unknown logical operator {logoperator.name}")
 
     def apply_select_model(self):
         """ Applies $select parameter
@@ -753,7 +768,7 @@ class PeeweeODataQuery:
             elif type(odata_filter) == ODataFunction or type(odata_filter) == ODataOperator:
                 expr = self._filter_run_expression(odata_filter)
             else:
-                raise Exception(f"Wrong expression type in filter {odata_filter}")
+                raise ODataQueryException(f"Wrong expression type in filter {odata_filter}")
             
             self.where_cond.append(expr)
 
@@ -771,7 +786,7 @@ class PeeweeODataQuery:
         ini_class = next((item for item in self.models if item.__name__.lower()+"s" == start_seg ),None)
 
         if not ini_class:
-            raise Exception(f"Object collection {start_seg} does not exist or not defined") 
+            raise ODataQueryException(f"Object collection {start_seg} does not exist or not defined") 
 
         self.path_classes = []
         self.navigated_class = ini_class
@@ -792,12 +807,12 @@ class PeeweeODataQuery:
             self.write_log(f"Searching path: { item['entity'] }")
             if found_class != None:
                 if self.path_classes[-1].data_type == DataType.COLLECTION and data_type == DataType.COLLECTION:
-                    raise Exception(f"Incorrect path , two collections cannot be realted {self.path_classes[-1].path} and {item['entity']}")
+                    raise ODataQueryException(f"Incorrect path , two collections cannot be realted {self.path_classes[-1].path} and {item['entity']}")
                 
                 self.write_log(f"Checking if class {found_class} is allowed ")
 
                 if found_class not in self.models and found_class not in self.expandable:
-                    raise Exception(f"Operations is not allowed!")
+                    raise ODataQueryException(f"Operations is not allowed!")
                 
                 self.write_log(f"Found path: { item['entity'] }")
                 
@@ -805,7 +820,7 @@ class PeeweeODataQuery:
 
                 #avoid circular referencing
                 if pclass != None:
-                    raise Exception(f"Circular relation was discoverd in path {self.parser.path} , involving {self.navigated_class}")
+                    raise ODataQueryException(f"Circular relation was discoverd in path {self.parser.path} , involving {self.navigated_class}")
                 
                 #Add navigation path to the collection
                 ref_class = NavigationPath(found_class,path=item["entity"],data_type=data_type)
@@ -824,7 +839,7 @@ class PeeweeODataQuery:
                     data_type = DataType.ENTITY
 
             else:
-                raise Exception(f"Odata path cannot be found {item['entity']}")
+                raise ODataQueryException(f"Odata path cannot be found {item['entity']}")
             
             self.path_classes.append(ref_class)
             self.navigated_class = found_class
@@ -846,13 +861,13 @@ class PeeweeODataQuery:
                 if exp_class:
 
                     if exp_class not in self.models and exp_class not in self.expandable:
-                        raise Exception(f"Operation (expand) is not allowed!")
+                        raise ODataQueryException(f"Operation (expand) is not allowed!")
                     if item not in self.expands:
                         self.write_log(f"Adding expand {item} {nested}")
                         #add expand parameter for later processing
                         self.expands.append((exp_class,item,nested))
                 else:
-                    raise Exception(f"Cannot expand unknown item {item}")
+                    raise ODataQueryException(f"Cannot expand unknown item {item}")
     def find_model_rel(self,model_class,name:str) -> Tuple[object , DataType,bool]:
         """ Discovers realtionship via field name (fks and backrefs)
 
@@ -985,6 +1000,9 @@ class PeeweeODataQuery:
 
 
             for model,exp,nested in self.expands:
+
+                if self.max_expand == 0:
+                    raise ODataQueryException("Maximum expand levels were reached!")
                 
                 self.write_log(f"Expanding {exp} {nested} ")
 
@@ -1011,7 +1029,7 @@ class PeeweeODataQuery:
 
 
                 if not fk_field:
-                    raise Exception(f"Cannot resolve backref field for {exp}")
+                    raise ODataQueryException(f"Cannot resolve backref field for {exp}")
 
                 if not nested:
                     nested = ""
@@ -1024,6 +1042,7 @@ class PeeweeODataQuery:
                 sub_tree.set_hidden_fields(self.hidden)
                 sub_tree.set_search_fields(self.search_fields)
                 sub_tree.set_expand_complex(self.expand_complex)
+                sub_tree.set_max_expand(self.max_expand-1)
                 sub_tree.restrictions = self.restrictions
                 filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
                 # Serialize the filtered and expanded result
