@@ -1,6 +1,24 @@
+<<<<<<< HEAD
 <?xml version="1.0" encoding="UTF-8"?> 
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> 
 <url>
   <loc>https://devilx85.github.io/odata-pyq/</loc>
 </url>
+=======
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
+
+
+<url>
+  <loc>https://devilx85.github.io/odata-pyq/</loc>
+  <lastmod>2025-08-17T15:01:52+00:00</lastmod>
+</url>
+
+
+>>>>>>> 9ae2bdd2f7372d0e6a5b0767b2128222ac477739
 </urlset>
