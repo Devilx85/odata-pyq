@@ -172,10 +172,12 @@ class PeeweeODataQuery:
         #Max expand levels
         self.max_expand = 3
 
-        #Model Keys
+        #Add odata id key to response
         self.with_odata_id=True
+        #Add etags to response
         self.include_etag=False
-        
+
+        #Model Keys        
         self.model_keys = self._get_model_key_fields(models)
 
         #Save unique and key fields
@@ -1060,7 +1062,13 @@ class PeeweeODataQuery:
 
 
     def _build_expand_queries(self,model,query_list=[]):
+        """ Build queries for expand selects and prefetch 
 
+        Args:
+            model       model class (navigated clas)
+            query_list  List of queries to add for prefetch
+
+        """ 
         for model,exp,nested in self.expands:
 
             if self.max_expand == 0:
@@ -1120,8 +1128,6 @@ class PeeweeODataQuery:
 
         Args:
             query_result    model class to loop for backrefs and foreignkeys to check
-            with_odata_id   include odata id? id should be in the selected fields
-            include_etag    etag metho should be defined in class model and given in constructor as parameter
 
         """ 
         def serialize(obj):
@@ -1181,7 +1187,7 @@ class PeeweeODataQuery:
                 else:
                     # If for some reason the data isn't there, return an empty list.
                     data[exp] = []
-                    
+
 
 
             # Hide fields:
