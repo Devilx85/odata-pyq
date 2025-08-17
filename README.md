@@ -284,6 +284,7 @@ query.include_etag = True
 # The resulting JSON will include: "@odata.etag": "W/\"1754321098.76543\""
 user = query.to_odata_response(query.query())
 ```
+If ETAGs are truned on and provided in UPDATe request, method will compare them and raise exception in case etags do not match.
 
 **Entity IDs (`@odata.id`)** provide the canonical URL for each entity in the response. They are enabled by default.
 
