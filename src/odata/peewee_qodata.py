@@ -184,6 +184,8 @@ class PeeweeODataQuery:
         self.model_ukeys = self._get_model_unique_fields(models)
         self.model_fkeys = self._get_model_key_fields(models)
 
+        #Count records
+        self.counted = None
         
 
     def set_model_ufield_as_key(self,model,key:str):
@@ -422,7 +424,8 @@ class PeeweeODataQuery:
             query = query.limit(self.parser.top)
 
         if self.parser.count == True:
-            query = query.count()
+            self.counted = query.count()
+
 
         if self.expands:
             expand_queries = []
@@ -1209,8 +1212,8 @@ class PeeweeODataQuery:
         if isinstance(query_result, Model):
             result_list = [serialize(query_result)]
         else:
-            if self.parser.count == True:
-                return str(query_result)
+            #if self.parser.count == True:
+            #    return str(query_result)
             
             result_list = [serialize(obj) for obj in query_result]
 
@@ -1222,6 +1225,9 @@ class PeeweeODataQuery:
             final_res = { "value" : result_list}
             if self.skiptoken_size != 0 and self.next_page != -1:
                 final_res["@odata.nextLink"] = self._replace_skiptoken(str(self.next_page))
+
+        if self.counted:
+            final_res["@odata.count"] = self.counted
 
         return final_res
 
