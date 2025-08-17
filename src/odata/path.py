@@ -4,6 +4,7 @@ from lark import Lark, Transformer, v_args
 
 
 odata_path_grammar = r"""
+
 start: resource_path
 
 resource_path: "/" segment ("/" segment)* "/"?
@@ -14,13 +15,19 @@ key_values: key_value ("," key_value)* | value ("," value)*
 key_value: dotted_name "=" value
 value: SIGNED_NUMBER      -> number
      | ESCAPED_STRING     -> string
+     | SINGLE_QUOTED_STRING -> string
 
 dotted_name: /[a-zA-Z_][a-zA-Z0-9_\$.]*/
+
+SINGLE_QUOTED_STRING: "'" (ESCAPED_CHAR | /[^'\\]/)* "'"
+ESCAPED_CHAR: "\\" /[nrt'\"\\]/
 
 %import common.SIGNED_NUMBER
 %import common.ESCAPED_STRING
 %import common.WS
 %ignore WS
+
+
 """
 
 
@@ -33,9 +40,10 @@ class ODataPathTransformer(Transformer):
     def key_value(self, key, val):
         return (str(key), val)
 
+
     def key_values(self, *args):
         if all(isinstance(arg, tuple) for arg in args):
-            return dict(args)  # named keys
+            return [{k: v} for k, v in args]  # list of dicts
         else:
             return list(args)  # positional keys
 

@@ -122,7 +122,26 @@ class TestODataURLParser:
         
         assert parser.parsed_path[1]["entity"] == "users"
         assert parser.parsed_path[1]["keys"] == [123]
-    
+
+    def test_url_with_id_full(self):
+        """Test URL parsing with entity ID"""
+        parser = ODataParser("http://localhost/api/users(id = 123)")
+        parser.run()
+        
+        assert parser.parsed_path[1]["entity"] == "users"
+        assert parser.parsed_path[1]["keys"][0] == {"id" : 123}
+
+
+    def test_url_with_id_full_compound(self):
+        """Test URL parsing with entity ID"""
+        parser = ODataParser("http://localhost/api/users(key1 = 123 , key2 = 'extrakey' )")
+        parser.run()
+        
+        print("******************",parser.parsed_path[1]["keys"])
+        assert parser.parsed_path[1]["entity"] == "users"
+        assert parser.parsed_path[1]["keys"][0] == {"key1" : 123 }
+        assert parser.parsed_path[1]["keys"][1] == {"key2" : "extrakey"}
+
     def test_navigation_path(self):
         """Test URL parsing with navigation paths"""
         parser = ODataParser("http://localhost/api/users(123)/orders")
@@ -227,7 +246,18 @@ class TestPeeweeODataQuery:
         assert len(result) == 1
         assert result[0].id == 1
         assert result[0].name == "John Doe"
+
+    def test_single_entity_query_full(self):
+        """Test single entity query with ID"""
+        models = [User, Order, Product, OrderItem]
+        query_obj = PeeweeODataQuery(models, "/users(id = 1)")
+        result = list(query_obj.query())
+        
+        assert len(result) == 1
+        assert result[0].id == 1
+        assert result[0].name == "John Doe"
     
+
     def test_filter_query(self):
         """Test query with $filter"""
         models = [User, Order, Product, OrderItem]
@@ -246,7 +276,16 @@ class TestPeeweeODataQuery:
         
         assert len(result) == 1
         assert result[0].name == "John Doe"
-    
+
+    def test_filter_string_contains_with_eq(self):
+        """Test string contains filter"""
+        models = [User, Order, Product, OrderItem]
+        query_obj = PeeweeODataQuery(models, "/users?$filter=contains(name,'John') eq true")
+        result = list(query_obj.query())
+        
+        assert len(result) == 1
+        assert result[0].name == "John Doe"
+
     def test_filter_boolean(self):
         """Test boolean filter"""
         models = [User, Order, Product, OrderItem]
