@@ -13,14 +13,14 @@ This library is composed of two main layers: a powerful, standalone **OData Pars
 
 ### Complete OData v4 Query Support
 
-  * **$filter**: Advanced filtering with Boolean conditions and logical operators (`and`, `or`, `not`).
-  * **$select**: Field selection with comma-separated lists.
-  * **$expand**: Includes related entities inline, with support for nested parameters and sub-queries.
-  * **$orderby**: Multi-field sorting with ascending (`asc`) and descending (`desc`) directions.
-  * **$top** & **$skip**: Limit and offset for client-side pagination.
-  * **$skiptoken**: Server-side, token-based pagination with automatic `@odata.nextLink` generation.
-  * **$count**: Requests a total count of matching entities.
-  * **$search**: Full-text search across specified model fields.
+  * **`$filter`**: Advanced filtering with Boolean conditions and logical operators (`and`, `or`, `not`).
+  * **`$select`**: Field selection to shape the JSON output.
+  * **`$expand`**: Includes related entities inline, with full support for nested parameters and sub-queries (e.g., nested `$filter`, `$select`, `$orderby`).
+  * **`$orderby`**: Multi-field sorting with ascending (`asc`) and descending (`desc`) directions.
+  * **`$top`** & **`$skip`**: Limit and offset for simple client-side pagination.
+  * **`$skiptoken`**: Robust server-side, token-based pagination with automatic `@odata.nextLink` generation.
+  * **`$count`**: Requests a total count of matching entities instead of returning the data.
+  * **`$search`**: Full-text search across one or more pre-configured model fields.
 
 ### Advanced Filtering Capabilities
 
@@ -36,11 +36,12 @@ This library is composed of two main layers: a powerful, standalone **OData Pars
 
   * **Full CRUD Operations**: Complete support for GET, POST, PUT, PATCH, and DELETE.
   * **Composite Key Support**: Natively handles models with multiple primary keys or designated unique keys for entity access.
-  * **Relationship Navigation**: Seamlessly traverses foreign keys and back-references in URL paths.
+  * **Relationship Navigation**: Seamlessly traverses foreign keys and back-references in URL paths (e.g., `/Users(123)/Orders`).
   * **Access Control**: Define which models are browsable, expandable, or modifiable.
   * **Circular Reference Protection**: Automatically detects and prevents circular dependencies in URL paths.
   * **Recursive Expansion Control**: Set a maximum depth for `$expand` operations to protect against performance issues.
   * **Hidden Fields**: Enhance security by controlling field visibility in the final JSON output.
+  * **OData Metadata Generation**: Includes a utility to automatically generate an OData `$metadata` XML document from your Peewee models.
   * **Comprehensive Logging**: Full operation tracking and debugging via a standard logger instance.
 
 -----
@@ -62,7 +63,14 @@ from peewee import *
 from pewee_qodata import PeeweeODataQuery
 import datetime
 
-class User(Model):
+# In-memory SQLite database for the example
+db = SqliteDatabase(':memory:')
+
+class BaseModel(Model):
+    class Meta:
+        database = db
+
+class User(BaseModel):
     id = AutoField()
     name = CharField()
     email = CharField(unique=True)
@@ -70,36 +78,119 @@ class User(Model):
     is_active = BooleanField(default=True)
     created_date = DateTimeField(default=datetime.datetime.now)
 
-class Order(Model):
+class Order(BaseModel):
     id = AutoField()
     user = ForeignKeyField(User, backref='orders')
     product = CharField()
     amount = DecimalField()
     created_date = DateTimeField(default=datetime.datetime.now)
 
+# List of models exposed through the OData API
 MODELS = [User, Order]
+
+# Create tables
+db.connect()
+db.create_tables(MODELS)
 ```
 
 ### 2\. Perform Queries
 
 ```python
-# GET /users?$select=name,email&$expand=orders($filter=amount gt 100)
-url = "/users?$select=name,email&$expand=orders($filter=amount gt 100)"
-query = PeeweeODataQuery(MODELS, url, expandable=[Order])
+# Basic GET request for a collection
+url = "/users"
+query = PeeweeODataQuery(MODELS, url)
 results = query.to_odata_response(query.query())
-```
 
-### 3\. Navigate to Entities
-
-```python
 # Access a user by their primary key: /users(123)
 query_by_id = PeeweeODataQuery(MODELS, "/users(123)")
 user = query_by_id.to_odata_response(query_by_id.query())
 
 # Access by a unique field: /users(email='john@example.com')
 query_by_email = PeeweeODataQuery(MODELS, "/users(email='john@example.com')")
-query_by_email.set_model_ufield_as_key(User, 'email')
+query_by_email.set_model_ufield_as_key(User, 'email') # Designate 'email' as the lookup key
 user = query_by_email.to_odata_response(query_by_email.query())
+```
+
+-----
+
+## 💡 Advanced Query Examples
+
+Here are examples of how to use various OData query options.
+
+### `$select`: Specifying Fields
+
+To limit the properties returned, use `$select`.
+
+```python
+# GET /users?$select=name,email
+# Returns a list of users, but only with their 'name' and 'email' fields.
+url = "/users?$select=name,email"
+query = PeeweeODataQuery(MODELS, url)
+results = query.to_odata_response(query.query())
+```
+
+### `$expand`: Including Related Data
+
+To load related entities, use `$expand`. You can also apply nested OData queries within the expand.
+
+```python
+# GET /users?$select=name&$expand=orders($filter=amount gt 100;$select=product,amount)
+# Returns users' names and, for each user, embeds a list of their orders
+# where the amount is over 100, showing only the product and amount of each order.
+url = "/users?$select=name&$expand=orders($filter=amount gt 100;$select=product,amount)"
+query = PeeweeODataQuery(MODELS, url, expandable=[Order])
+results = query.to_odata_response(query.query())
+```
+
+**Note**: OData uses `&` as a separator, but for nested queries inside parentheses, this library also correctly parses `;` as a separator to simplify URL encoding.
+
+### `$orderby`: Sorting Results
+
+Sort by one or more fields in `asc` (default) or `desc` order.
+
+```python
+# GET /orders?$orderby=amount desc,created_date
+# Returns all orders, sorted first by amount descending, then by creation date ascending.
+url = "/orders?$orderby=amount desc,created_date"
+query = PeeweeODataQuery(MODELS, url)
+results = query.to_odata_response(query.query())
+```
+
+### `$count`: Getting a Total Count
+
+To get only the number of items that match a query, set `$count=true`.
+
+```python
+# GET /users?$filter=is_active eq true&$count=true
+# Returns an integer representing the total count of active users.
+url = "/users?$filter=is_active eq true&$count=true"
+query = PeeweeODataQuery(MODELS, url)
+count = query.to_odata_response(query.query()) # Returns "5" instead of a JSON object
+```
+
+### `$search`: Full-Text Search
+
+First, configure which fields are searchable for a model.
+
+```python
+# GET /users?$search="jane"
+# Searches for "jane" within the 'name' and 'email' fields.
+url = "/users?$search=\"jane\""
+query = PeeweeODataQuery(MODELS, url)
+query.set_search_fields(['name', 'email']) # Configure searchable fields
+results = query.to_odata_response(query.query())
+```
+
+### Navigating to Related Entities
+
+You can directly query a related collection or entity through URL path navigation.
+
+```python
+# GET /users(123)/orders?$filter=amount gt 50
+# Directly retrieves all orders for user 123 where the amount is greater than 50.
+url = "/users(123)/orders?$filter=amount gt 50"
+query = PeeweeODataQuery(MODELS, url)
+orders = query.to_odata_response(query.query())
 ```
 
 -----
@@ -111,13 +202,16 @@ user = query_by_email.to_odata_response(query_by_email.query())
 ```python
 # POST /users
 query = PeeweeODataQuery(MODELS, "/users")
-new_user = query.create({'name': 'Jane Doe', 'email': 'jane@example.com', 'age': 30})
+new_user_data = {'name': 'Jane Doe', 'email': 'jane@example.com', 'age': 30}
+new_user = query.create(new_user_data)
 ```
 
 ### Update (PUT / PATCH)
 
+Use `patch=True` for partial updates. `patch=False` (or omitted) requires all fields for a full replacement (PUT).
+
 ```python
-# Partial update: PATCH /users(123)
+# PATCH /users(123)
 query = PeeweeODataQuery(MODELS, "/users(123)")
 updated_user = query.update({'age': 32}, patch=True)
 ```
@@ -137,19 +231,21 @@ deleted_user = query.delete()
 ```python
 query = PeeweeODataQuery(MODELS, "/users?$top=5")
 
-# Enable server-side pagination
+# Enable server-side pagination with a page size of 100.
+# This will automatically add '@odata.nextLink' to results.
 query.set_skiptoken(100)
 
-# Hide sensitive fields from the output
+# Hide sensitive fields like a password hash from all outputs.
 query.set_hidden_fields(['password_hash'])
 
-# Configure searchable fields for $search
+# Configure searchable fields for the $search operator.
 query.set_search_fields(['name', 'email'])
 
-# Set max $expand depth
+# Set a max recursion depth for $expand to prevent overly complex queries.
 query.set_max_expand(3)
 
-# Add global 'where' conditions for a model
+# Add global 'where' conditions for a model (e.g., for tenancy or soft-delete).
+# This condition will be AND-ed with all other filters for the User model.
 query.add_restricition(User, [User.is_active == True])
 ```
 
@@ -164,24 +260,21 @@ The library's power comes from its two-layer architecture: the parser and the qu
   * **`ODataURLParser`**: A utility that intelligently splits OData query strings, properly handling nested parentheses and quotes found in complex `$expand` and `$filter` clauses.
   * **`ODataParser`**: The primary parser that uses the **Lark** library with a formal OData grammar to transform a URL into a structured Python object tree.
   * **`PeeweeODataQuery`**: The main engine that consumes the object tree from the parser and builds the corresponding Peewee ORM query.
-
------
+  * **`PeeweeODataMeta`**: A helper class to generate an OData v4 metadata document (`$metadata`) from your Peewee models, useful for client discovery.
 
 ### Understanding the `$filter` Expression Tree
 
-When `ODataParser` processes a `$filter` string, it doesn't just validate it; it transforms it into a nested object structure—an **expression tree**. This tree is then easy for the `PeeweeODataQuery` engine to walk through and convert into a database query.
+When `ODataParser` processes a `$filter` string, it transforms it into a nested object structure—an **expression tree**. This tree is then easy for the `PeeweeODataQuery` engine to traverse and convert into a database query.
 
 The tree is composed of the following object types:
 
-  * `ODataLogOperator`: Represents a logical operation: `and`, `or`, `not`. It has `left` and `right` attributes that hold the next nodes in the tree.
-  * `ODataOperator`: Represents a comparison (`eq`, `ne`, `gt`, etc.) or arithmetic (`add`, `sub`, etc.) operation. It has `a` and `b` attributes for the two operands.
-  * `ODataFunction`: Represents a function call like `contains()` or `now()`. It stores the function `name` and a list of `args`.
-  * `ODataField`: A leaf node representing a model's field or property (e.g., `name`).
+  * `ODataLogOperator`: Represents a logical operation: `and`, `or`, `not`.
+  * `ODataOperator`: Represents a comparison (`eq`, `ne`, `gt`) or arithmetic (`add`, `sub`) operation.
+  * `ODataFunction`: Represents a function call like `contains()` or `now()`.
+  * `ODataField`: A leaf node representing a model's field (e.g., `name`).
   * `ODataPrimitve`: A leaf node representing a literal value (e.g., the string `'John'` or the number `25`).
 
 #### Example Breakdown
-
-Let's see how a complex filter is deconstructed.
 
 **OData URL Filter:**
 `$filter=(age gt 25 and contains(name, 'John')) or startswith(email, 'admin')`
@@ -203,47 +296,15 @@ ODataLogOperator(name='or')
     └── args[1]: ODataPrimitve(value='admin')
 ```
 
-The `PeeweeODataQuery` engine can then recursively traverse this tree to build the final Peewee expression: `((User.age > 25) & (User.name.contains('John'))) | (User.email.startswith('admin'))`.
-
-### Standalone Parser Usage
-
-You can use the parser directly to deconstruct and analyze any OData URL.
-
-```python
-from odata.odata_parser import ODataParser
-
-# A complex OData URL
-url = "/users?$filter=(age gt 25 and contains(name, 'John')) or startswith(email, 'admin')&$orderby=age desc"
-
-# 1. Initialize and run the parser
-parser = ODataParser(url)
-parser.run()
-
-# 2. Inspect the structured results
-print(f"Path: {parser.parsed_path}")
-# Output: Path: [{'entity': 'users'}]
-
-print(f"Order By: {parser.orderby}")
-# Output: Order By: {'age': 'desc'}
-
-# 3. Access the filter tree
-filter_tree = parser.filter
-print(f"Top-level operator: {filter_tree.name}")
-# Output: Top-level operator: or
-
-# You can now traverse the tree as described above
-left_side = filter_tree.left
-print(f"Left side operator: {left_side.name}")
-# Output: Left side operator: and
-```
+The `PeeweeODataQuery` engine recursively traverses this tree to build the final Peewee expression: `((User.age > 25) & (User.name.contains('John'))) | (User.email.startswith('admin'))`.
 
 -----
 
 ## 🚨 Limitations
 
-  * **Deep Structure Mutations**: Complex nested create/update operations in a single request are not yet supported.
+  * **Deep Structure Mutations**: Complex nested create/update operations in a single request (deep inserts) are not yet supported.
   * **Advanced OData Functions**: Some OData v4 functions beyond string, date, and arithmetic operations are not implemented.
-  * **Performance**: While optimized, complex and deeply nested expansions on very large datasets may require careful schema design and indexing.
+  * **Performance**: While optimized, complex and deeply nested expansions on very large datasets may require careful schema design and database indexing.
 
 -----
 
