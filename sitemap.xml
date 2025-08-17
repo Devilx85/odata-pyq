@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 <?xml version="1.0" encoding="UTF-8"?> 
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> 
 <url>
@@ -22,3 +23,11 @@
 
 >>>>>>> 9ae2bdd2f7372d0e6a5b0767b2128222ac477739
 </urlset>
+=======
+<?xml version="1.0" encoding="UTF-8"?> 
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> 
+<url>
+  <loc>https://devilx85.github.io/odata-pyq/</loc>
+</url>
+</urlset>
+>>>>>>> 4fbf66ad82f79632e7a4fc10ecd3786f9752e665
