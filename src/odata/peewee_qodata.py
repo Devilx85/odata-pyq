@@ -130,6 +130,7 @@ class PeeweeODataQuery:
         self.where_cond = []
         self.path_classes = None
         self.expands = []
+        self.expand_queries =  {}
         self.sorts = []
         self.select_always = select_always
 
@@ -146,7 +147,9 @@ class PeeweeODataQuery:
         self.hidden = []
 
         #Expand complex
-        self.expand_complex = True
+        self.expand_complex = False
+        #For expand command on complex
+        self.complex_classes = []
 
         #Search fiedls
         self.search_fields = []
@@ -170,6 +173,8 @@ class PeeweeODataQuery:
         self.max_expand = 3
 
         #Model Keys
+        self.with_odata_id=True
+        self.include_etag=False
         
         self.model_keys = self._get_model_key_fields(models)
 
@@ -369,6 +374,17 @@ class PeeweeODataQuery:
                         select.append(field_object.rel_model)
                     if field_object.rel_model not in self.joins:
                         self.joins.append(field_object.rel_model)
+        elif self.complex_classes:
+            #Expand properties with class relations passed as $expand
+            
+            fields_to_expand = [(field_name, field_object) for field_name, field_object in self.navigated_class._meta.fields.items() if field_name in self.complex_classes]
+            self.write_log(f"Adding complex expands :  {fields_to_expand}")
+            for field_name, field_object in fields_to_expand:
+                if isinstance(field_object, ForeignKeyField) and hasattr(field_object,'rel_model'):
+                    if field_object.rel_model not in select:
+                        select.append(field_object.rel_model)
+                    if field_object.rel_model not in self.joins:
+                        self.joins.append(field_object.rel_model)
 
         query = self.navigated_class.select(*select).distinct()
 
@@ -409,6 +425,10 @@ class PeeweeODataQuery:
         if self.parser.count == True:
             query = query.count()
 
+        if self.expands:
+            expand_queries = []
+            self._build_expand_queries(self.navigated_class,expand_queries)
+            query = query.prefetch(*expand_queries)
 
 
 
@@ -948,10 +968,14 @@ class PeeweeODataQuery:
 
                     if exp_class not in self.models and exp_class not in self.expandable:
                         raise ODataQueryException(f"Operation (expand) is not allowed!")
-                    if item not in self.expands:
-                        self.write_log(f"Adding expand {item} {nested}")
-                        #add expand parameter for later processing
-                        self.expands.append((exp_class,item,nested))
+                    if backref:
+                        if item not in self.expands:
+                            self.write_log(f"Adding expand {item} {nested}")
+                            #add expand parameter for later processing
+                            self.expands.append((exp_class,item,nested))
+                    else:
+                        if item not in self.complex_classes:
+                            self.complex_classes.append(item)
                 else:
                     raise ODataQueryException(f"Cannot expand unknown item {item}")
     def find_model_rel(self,model_class,name:str) -> Tuple[object , DataType,bool]:
@@ -1034,9 +1058,64 @@ class PeeweeODataQuery:
         
         return updated_url
 
-        
 
-    def to_odata_response(self, query_result,with_odata_id=True,include_etag=False)-> list | dict:
+    def _build_expand_queries(self,model,query_list=[]):
+
+        for model,exp,nested in self.expands:
+
+            if self.max_expand == 0:
+                raise ODataQueryException("Maximum expand levels were reached!")
+            
+            self.write_log(f"Expanding {exp} {nested} ")
+
+            child_include_etag = self.include_etag
+            child_etag_callable = self.etag_callable
+            child_with_odata_id = self.with_odata_id
+
+            if model not in self.models:
+                child_include_etag = False
+                child_etag_callable = None
+                child_with_odata_id = False
+                child_models = [model]
+                child_expandabel = []
+            else:
+                child_models = self.models
+                child_expandabel = self.expandable
+
+
+
+            # Build a filtered query for the related model
+            fk_field, fk_model = self.get_field_name_from_backref(model, exp)
+
+
+            if not fk_field:
+                raise ODataQueryException(f"Cannot resolve backref field for {exp}")
+
+            if not nested:
+                nested = ""
+            
+            #Convert back internal expand ';' -> '&' for correct parsing 
+            nested = '&'.join(ODataURLParser.smart_split(nested,';'))
+            
+            
+            #build a query object for the recursive backref processing
+            sel_always = [fk_field.name]
+            sel_always.extend(self.select_always)
+            sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=sel_always)
+            sub_tree.set_hidden_fields(self.hidden)
+            sub_tree.set_search_fields(self.search_fields)
+            sub_tree.set_expand_complex(self.expand_complex)
+            sub_tree.set_max_expand(self.max_expand-1)
+            sub_tree.include_etag = child_include_etag
+            sub_tree.restrictions = self.restrictions
+            sub_tree.with_odata_id = child_with_odata_id
+
+            filtered_query = sub_tree.query()
+            query_list.append(filtered_query)
+            self.expand_queries[exp] = sub_tree
+
+
+    def to_odata_response(self, query_result)-> list | dict:
         """ Converts query result to a dictionary or list od dicts
 
         Args:
@@ -1059,82 +1138,51 @@ class PeeweeODataQuery:
                                     data[field_name] = related_obj.__data__.copy()
                             except:
                                 pass
+            elif self.complex_classes:
+                fields_to_expand = [(field_name, field_object) for field_name, field_object in self.navigated_class._meta.fields.items() if field_name in self.complex_classes]
+                for field_name, field_object in fields_to_expand:
+                    if isinstance(field_object, ForeignKeyField):
+                            try:
+                                related_obj = getattr(obj, field_name, None)
+                                if related_obj:
+                                    data[field_name] = related_obj.__data__.copy()
+                            except:
+                                pass                
 
-            if with_odata_id:
+            if self.with_odata_id:
                 name = self._extract_before_parenthesis(self.path_classes[0].path)
                 data["@odata.id"] = f"{name}({data['id']})"
-            if include_etag:
+            if self.include_etag:
                 f = getattr(obj,self.etag_callable)
                 data["@odata.etag"] = f()
 
             
-            difference = None
-
- 
             if self.parser.select:
                 #Hide fiedls which should be always selected but not in the list, like id 
                 
                 difference = [item for item in self.select_always if item not in self.parser.select]
-                self.write_log(f"Hiding fields: {difference}")   
+                 
 
                 data = {
                     k: v
                     for k, v in data.items()
                     if k not in difference
                 }
+            
+            difference = None
 
-
-
-            for model,exp,nested in self.expands:
-
-                if self.max_expand == 0:
-                    raise ODataQueryException("Maximum expand levels were reached!")
-                
-                self.write_log(f"Expanding {exp} {nested} ")
-
-                child_include_etag = include_etag
-                child_etag_callable = self.etag_callable
-                child_include_etag = include_etag
-                child_with_odata_id = with_odata_id
-
-                if model not in self.models:
-                    child_include_etag = False
-                    child_etag_callable = None
-                    child_include_etag = False
-                    child_with_odata_id = False
-                    child_models = [model]
-                    child_expandabel = []
+            for model, exp, nested in self.expands:
+                #    Check if the prefetched data exists on the object instance.
+                #    Peewee adds it as an attribute with the same name as the backref.
+                if hasattr(obj, exp):
+                    prefetched_results = getattr(obj, exp)
+                    sub_tree = self.expand_queries[exp] 
+                    data[exp] = [sub_tree.to_odata_response(item) for item in prefetched_results]
                 else:
-                    child_models = self.models
-                    child_expandabel = self.expandable
+                    # If for some reason the data isn't there, return an empty list.
+                    data[exp] = []
+                    
 
-
-
-                # Build a filtered query for the related model
-                fk_field, fk_model = self.get_field_name_from_backref(model, exp)
-
-
-                if not fk_field:
-                    raise ODataQueryException(f"Cannot resolve backref field for {exp}")
-
-                if not nested:
-                    nested = ""
-                
-                #Convert back internal expand ';' -> '&' for correct parsing 
-                nested = '&'.join(ODataURLParser.smart_split(nested,';'))
-                
-                #build a query object for the recursive backref processing
-                sub_tree = PeeweeODataQuery( child_models, "/" + model.__name__.lower() +"s?" + nested,expandable=child_expandabel,etag_callable=child_etag_callable,select_always=self.select_always)
-                sub_tree.set_hidden_fields(self.hidden)
-                sub_tree.set_search_fields(self.search_fields)
-                sub_tree.set_expand_complex(self.expand_complex)
-                sub_tree.set_max_expand(self.max_expand-1)
-                sub_tree.restrictions = self.restrictions
-                filtered_query = sub_tree.query(join=[fk_model],where=[fk_field == obj.id])
-                # Serialize the filtered and expanded result
-                data[exp] = sub_tree.to_odata_response(filtered_query,include_etag=child_include_etag,with_odata_id=child_with_odata_id)
-
-                return data
 
             # Hide fields:
             data = {
