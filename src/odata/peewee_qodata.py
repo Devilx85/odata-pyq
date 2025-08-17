@@ -349,9 +349,6 @@ class PeeweeODataQuery:
         else:
             select.append(self.navigated_class)
 
-
-        self.write_log(f"Building req ...sel {self.select} join {self.joins} where {self.where_cond} , backrefs {backrefs}")
-
         #Collect all joins and conds 
         for item in self.path_classes[:-1]:
             self.where_cond.extend(item.where)
