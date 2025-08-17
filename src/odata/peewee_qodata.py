@@ -718,9 +718,9 @@ class PeeweeODataQuery:
         }
 
         function_map = {
-            "contains": lambda a1, a2: a1.contains(a2),
-            "startswith": lambda a1, a2: a1.startswith(a2),
-            "endswith": lambda a1, a2: a1.endswith(a2),
+            "contains": lambda a1, a2: a1.contains(str(a2)),
+            "startswith": lambda a1, a2: a1.startswith(str(a2)),
+            "endswith": lambda a1, a2: a1.endswith(str(a2)),
             "now" : lambda : datetime.now()
         }
         
