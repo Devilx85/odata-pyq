@@ -517,6 +517,12 @@ class PeeweeODataQuery:
         
         entity = res_data[0]
         
+        if "@odata.etag" in data and self.etag_callable:
+            f = getattr(entity,self.etag_callable)
+            etag = f()
+            if etag != data["@odata.etag"]:
+                raise ODataQueryException(f"Data was already modified old {data['@odata.etag']} vs new  {etag}!")  
+
         if len(self.path_classes)>1 and self.path_classes[-2].data_type == DataType.ENTITY:
             prev_navig = self.path_classes[-2]
             self.write_log(f"Setting backref : {cur_navig.backref_field.name} to {prev_navig.ids} ")
