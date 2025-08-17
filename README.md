@@ -35,13 +35,15 @@ This library is composed of two main layers: a powerful, standalone **OData Pars
 ### Enterprise-Ready Features
 
   * **Full CRUD Operations**: Complete support for GET, POST, PUT, PATCH, and DELETE.
-  * **Composite Key Support**: Natively handles models with multiple primary keys or designated unique keys for entity access.
+  * **High-Performance Eager Loading**: Automatically resolves the **N+1 query problem** using Peewee's `prefetch`, ensuring that even complex `$expand` operations are executed in a minimal number of database queries.
+  * **Optimistic Concurrency Control**: Supports **ETag** generation (`@odata.etag`) for safe concurrent updates.
+  * **Flexible Key Management**: Natively handles entity lookups by primary key, composite keys, or any designated **unique field** (e.g., `/Users(email='jane@example.com')`).
   * **Relationship Navigation**: Seamlessly traverses foreign keys and back-references in URL paths (e.g., `/Users(123)/Orders`).
+  * **Automatic Relationship Expansion**: Optionally configure the API to expand all direct foreign key relationships by default, without requiring an explicit `$expand` clause.
   * **Access Control**: Define which models are browsable, expandable, or modifiable.
   * **Circular Reference Protection**: Automatically detects and prevents circular dependencies in URL paths.
   * **Recursive Expansion Control**: Set a maximum depth for `$expand` operations to protect against performance issues.
   * **Hidden Fields**: Enhance security by controlling field visibility in the final JSON output.
-  * **OData Metadata Generation**: Includes a utility to automatically generate an OData `$metadata` XML document from your Peewee models.
   * **Comprehensive Logging**: Full operation tracking and debugging via a standard logger instance.
 
 -----
@@ -107,7 +109,8 @@ user = query_by_id.to_odata_response(query_by_id.query())
 
 # Access by a unique field: /users(email='john@example.com')
 query_by_email = PeeweeODataQuery(MODELS, "/users(email='john@example.com')")
-query_by_email.set_model_ufield_as_key(User, 'email') # Designate 'email' as the lookup key
+# Designate 'email' as the lookup key for the User model
+query_by_email.set_model_ufield_as_key(User, 'email')
 user = query_by_email.to_odata_response(query_by_email.query())
 ```
 
@@ -131,7 +134,7 @@ results = query.to_odata_response(query.query())
 
 ### `$expand`: Including Related Data
 
-To load related entities, use `$expand`. You can also apply nested OData queries within the expand.
+To load related entities, use `$expand`. This operation is highly optimized to prevent performance bottlenecks.
 
 ```python
 # GET /users?$select=name&$expand=orders($filter=amount gt 100;$select=product,amount)
@@ -228,6 +231,8 @@ deleted_user = query.delete()
 
 ## 🔧 Advanced Configuration
 
+### General Configuration
+
 ```python
 query = PeeweeODataQuery(MODELS, "/users?$top=5")
 
@@ -247,6 +252,48 @@ query.set_max_expand(3)
 # Add global 'where' conditions for a model (e.g., for tenancy or soft-delete).
 # This condition will be AND-ed with all other filters for the User model.
 query.add_restricition(User, [User.is_active == True])
+
+# Automatically expand all direct foreign key relationships in the output JSON.
+# For example, a query to /orders will automatically include the full user object.
+query.set_expand_complex(True)
+```
+
+### Response Metadata Configuration (`@odata.id` and `@odata.etag`)
+
+You can control the OData metadata fields included in the JSON response.
+
+**ETags (`@odata.etag`)** are used for optimistic concurrency control. To enable them, you must provide a method on your Peewee model that generates the ETag value.
+
+```python
+# 1. First, add an ETag generation method to your model.
+#    A last-updated timestamp or a version number are good sources.
+class User(BaseModel):
+    # ... other fields
+    updated_at = DateTimeField(default=datetime.datetime.now)
+
+    def get_etag(self):
+        # Generate a weak ETag from the timestamp
+        return f'W/"{self.updated_at.timestamp()}"'
+
+# 2. Instantiate the query engine, providing the NAME of the ETag method.
+query = PeeweeODataQuery(MODELS, "/users(1)", etag_callable='get_etag')
+
+# 3. Enable ETag inclusion in the response.
+query.include_etag = True
+
+# The resulting JSON will include: "@odata.etag": "W/\"1754321098.76543\""
+user = query.to_odata_response(query.query())
+```
+
+**Entity IDs (`@odata.id`)** provide the canonical URL for each entity in the response. They are enabled by default.
+
+```python
+# By default, with_odata_id is True.
+query = PeeweeODataQuery(MODELS, "/users")
+# The response will include: "@odata.id": "users(1)"
+
+# You can disable this behavior if not needed.
+query.with_odata_id = False
 ```
 
 -----
@@ -260,7 +307,6 @@ The library's power comes from its two-layer architecture: the parser and the qu
   * **`ODataURLParser`**: A utility that intelligently splits OData query strings, properly handling nested parentheses and quotes found in complex `$expand` and `$filter` clauses.
   * **`ODataParser`**: The primary parser that uses the **Lark** library with a formal OData grammar to transform a URL into a structured Python object tree.
   * **`PeeweeODataQuery`**: The main engine that consumes the object tree from the parser and builds the corresponding Peewee ORM query.
-  * **`PeeweeODataMeta`**: A helper class to generate an OData v4 metadata document (`$metadata`) from your Peewee models, useful for client discovery.
 
 ### Understanding the `$filter` Expression Tree
 
@@ -304,7 +350,7 @@ The `PeeweeODataQuery` engine recursively traverses this tree to build the final
 
   * **Deep Structure Mutations**: Complex nested create/update operations in a single request (deep inserts) are not yet supported.
   * **Advanced OData Functions**: Some OData v4 functions beyond string, date, and arithmetic operations are not implemented.
-  * **Performance**: While optimized, complex and deeply nested expansions on very large datasets may require careful schema design and database indexing.
+  * **Performance**: While the library is optimized to prevent N+1 query problems using `prefetch`, extremely complex queries on very large datasets still benefit from proper database indexing.
 
 -----
 
