@@ -1162,7 +1162,7 @@ class PeeweeODataQuery:
                                 pass                
 
             if self.with_odata_id:
-                name = self._extract_before_parenthesis(self.path_classes[0].path)
+                name = self.navigated_class.__name__.lower()+"s"
                 data["@odata.id"] = f"{name}({data['id']})"
             if self.include_etag:
                 f = getattr(obj,self.etag_callable)
