@@ -52,18 +52,20 @@ class NavigationPath:
                 raise ODataQueryException("Number of keys provided for the entity does not match with actual")
 
             keys_processed = []
-            #self.ids = keys
             self.data_type = DataType.ENTITY
+            
             if type(keys) != list:
                 keys = [keys]
             
+            key_index = 0
             for key in keys:
                 if type(key) != dict:    
-                    cond = ( model_keys[0] == key )
-                    if model_keys[0] in keys_processed:
+                    #Key was already processed?
+                    if model_keys[key_index] in keys_processed:
                         raise ODataQueryException(f"Key { model_keys[0].name } already was provided!")
-                    keys_processed.append(model_keys[0])
-                    self.ids.append({ "key": model_keys[0] , "value": key })
+                    cond = ( model_keys[key_index] == key )
+                    keys_processed.append(model_keys[key_index])
+                    self.ids.append({ "key": model_keys[key_index] , "value": key })
                 else:
                     first_key_provided = next(iter(key))
                     found_key = next((key for key in model_keys if key.name == first_key_provided),None)
@@ -75,7 +77,9 @@ class NavigationPath:
                     
                     keys_processed.append(found_key)
                     self.ids.append({ "key": found_key, "value": key[first_key_provided] })
-            
+                
+                key_index = key_index + 1
+
                 self.where.append( cond )
 
     def join_backref(self,field1,field2):
@@ -369,15 +373,10 @@ class PeeweeODataQuery:
         
         #Support for auto expanding FK definitions in the model
         if self.expand_complex:
-            for field_name, field_object in self.navigated_class._meta.fields.items():
-                if isinstance(field_object, ForeignKeyField) and hasattr(field_object,'rel_model'):
-                    if field_object.rel_model not in select:
-                        select.append(field_object.rel_model)
-                    if field_object.rel_model not in self.joins:
-                        self.joins.append(field_object.rel_model)
+            self.complex_classes = [field_name for field_name, field_object in self.navigated_class._meta.fields.items() ]
+
         elif self.complex_classes:
-            #Expand properties with class relations passed as $expand
-            
+            #Expand properties with class relations passed as $expand  
             fields_to_expand = [(field_name, field_object) for field_name, field_object in self.navigated_class._meta.fields.items() if field_name in self.complex_classes]
             self.write_log(f"Adding complex expands :  {fields_to_expand}")
             for field_name, field_object in fields_to_expand:
@@ -1023,15 +1022,6 @@ class PeeweeODataQuery:
 
         return  None , None , None
 
-    
-    def _extract_before_parenthesis(self,text):
-        """ Extracts path without id data
-
-        Args:
-            text  string
-
-        """ 
-        return text.split('(')[0].strip()
 
     def _replace_skiptoken(self,new_token: str) -> str:
         """ Replaces skiptoken in url
@@ -1140,17 +1130,8 @@ class PeeweeODataQuery:
             #Internal function for recursive processing            
             data = obj.__data__.copy()
 
-            #Support for auto expanding FK definitions in the model
-            if self.expand_complex:
-                for field_name, field_object in self.navigated_class._meta.fields.items():
-                    if isinstance(field_object, ForeignKeyField):
-                            try:
-                                related_obj = getattr(obj, field_name, None)
-                                if related_obj:
-                                    data[field_name] = related_obj.__data__.copy()
-                            except:
-                                pass
-            elif self.complex_classes:
+
+            if self.complex_classes:
                 fields_to_expand = [(field_name, field_object) for field_name, field_object in self.navigated_class._meta.fields.items() if field_name in self.complex_classes]
                 for field_name, field_object in fields_to_expand:
                     if isinstance(field_object, ForeignKeyField):
@@ -1194,8 +1175,6 @@ class PeeweeODataQuery:
                     # If for some reason the data isn't there, return an empty list.
                     data[exp] = []
 
-
-
             # Hide fields:
             data = {
                 k: v
@@ -1208,13 +1187,9 @@ class PeeweeODataQuery:
             return data
 
 
-
         if isinstance(query_result, Model):
             result_list = [serialize(query_result)]
-        else:
-            #if self.parser.count == True:
-            #    return str(query_result)
-            
+        else:            
             result_list = [serialize(obj) for obj in query_result]
 
 
