@@ -168,7 +168,7 @@ To get only the number of items that match a query, set `$count=true`.
 # Returns an integer representing the total count of active users.
 url = "/users?$filter=is_active eq true&$count=true"
 query = PeeweeODataQuery(MODELS, url)
-count = query.to_odata_response(query.query()) # Returns "5" instead of a JSON object
+count = query.to_odata_response(query.query()) # Returns "@odata.count" property along with the data
 ```
 
 ### `$search`: Full-Text Search
