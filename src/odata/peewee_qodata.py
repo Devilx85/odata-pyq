@@ -520,7 +520,15 @@ class PeeweeODataQuery:
             f = getattr(entity,self.etag_callable)
             etag = f()
             if etag != data["@odata.etag"]:
-                raise ODataQueryException(f"Data was already modified old {data['@odata.etag']} vs new  {etag}!")  
+                raise ODataQueryException(f"Data was already modified old {data['@odata.etag']} vs new  {etag}!")
+              
+        # Remove primary key fields from data if present
+        pk_fields = entity._meta.primary_key.field_names if hasattr(entity._meta.primary_key, 'field_names') else [entity._meta.primary_key.name]
+
+        for pk_field in pk_fields:
+            if pk_field in data:
+                del data[pk_field]
+
 
         if len(self.path_classes)>1 and self.path_classes[-2].data_type == DataType.ENTITY:
             prev_navig = self.path_classes[-2]
