@@ -19,7 +19,7 @@ This library is composed of two main layers: a powerful, standalone **OData Pars
   * **`$orderby`**: Multi-field sorting with ascending (`asc`) and descending (`desc`) directions.
   * **`$top`** & **`$skip`**: Limit and offset for simple client-side pagination.
   * **`$skiptoken`**: Robust server-side, token-based pagination with automatic `@odata.nextLink` generation.
-  * **`$count`**: Requests a total count of matching entities instead of returning the data.
+  * **`$count`**: Requests a total count of matching entities in `@odata.count` property.
   * **`$search`**: Full-text search across one or more pre-configured model fields.
 
 ### Advanced Filtering Capabilities
