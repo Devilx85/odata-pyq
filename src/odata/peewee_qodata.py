@@ -416,14 +416,16 @@ class PeeweeODataQuery:
                 self.parser.top  =  self.skiptoken_size
                 
                 self.write_log(f"Skipping {self.parser.skip} records and limit to {self.parser.top} with skiptoken = {self.parser.skip_token}")
-                
+
+        if self.parser.count == True:
+            self.counted = query.count()
+
         if self.parser.skip is not None:
             query = query.offset(self.parser.skip)
         if self.parser.top is not None:
             query = query.limit(self.parser.top)
 
-        if self.parser.count == True:
-            self.counted = query.count()
+
 
 
         if self.expands:
