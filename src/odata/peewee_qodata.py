@@ -399,7 +399,10 @@ class PeeweeODataQuery:
             query = query.where(*self.where_cond)
         if self.sorts:    
             query = query.order_by(*self.sorts)
-        
+        else:
+            keys = [key for key in self.model_fkeys[self.navigated_class.__name__]]
+            query = query.order_by(*keys)
+
         if self.skiptoken_size != 0:
             cnt_query = query
             total = cnt_query.count()
